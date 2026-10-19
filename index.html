@@ -1,0 +1,1028 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="light">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>STAR 姿勢分析</title>
+<style>
+/* Layout: 1カラムの縦フロー。上から順に 撮影 → 分析 → 確認 → 編集 → レポート の手順を進める */
+:root{
+  --ink:#1d2b2a;
+  --muted:#5b6b69;
+  --paper:#f3f6f5;
+  --card:#ffffff;
+  --line:#d8e2e0;
+  --teal:#1f6f6b;
+  --teal-deep:#17504d;
+  --teal-soft:#e2f0ee;
+  --gold:#b8923a;
+  --gold-soft:#f6efdc;
+  --warn:#8a5a12;
+  --danger:#a33a2e;
+  --font-sans:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic",sans-serif;
+  --font-serif:"Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",serif;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0;background:var(--paper);color:var(--ink);font-family:var(--font-sans);font-size:16px;line-height:1.7;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-top:max(12px,env(safe-area-inset-top,0px));padding-bottom:max(40px,env(safe-area-inset-bottom,0px));
+}
+.wrap{max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+header.top{padding:18px 4px 4px}
+.brand{display:flex;align-items:center;gap:10px;font-size:13px;letter-spacing:.06em;color:var(--teal-deep);font-weight:600}
+.brand svg{width:18px;height:18px;flex:none}
+h1{font-family:var(--font-serif);font-size:28px;line-height:1.3;margin:6px 0 4px;font-weight:700;letter-spacing:.04em}
+.lead{margin:0;color:var(--muted);font-size:14px}
+.privacy{background:var(--teal-soft);border-radius:12px;padding:12px 14px;font-size:13px;color:var(--teal-deep);line-height:1.6}
+section.step{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px 16px;display:flex;flex-direction:column;gap:14px;min-width:0}
+section.step[hidden]{display:none}
+.step-head{display:flex;align-items:baseline;gap:10px}
+.step-no{font-family:var(--font-serif);font-size:15px;color:var(--gold);font-weight:700;letter-spacing:.05em;white-space:nowrap}
+h2{margin:0;font-size:18px;line-height:1.4}
+h3{margin:0;font-size:15px}
+p{margin:0}
+.muted{color:var(--muted);font-size:13px}
+.views{display:grid;gap:14px;grid-template-columns:1fr}
+.view-card{border:1px solid var(--line);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.view-card h3{display:flex;justify-content:space-between;align-items:center}
+.tag{font-size:12px;font-weight:600;border-radius:999px;padding:2px 10px;background:var(--teal-soft);color:var(--teal-deep)}
+.tag.after{background:var(--gold-soft);color:var(--warn)}
+.slot{display:flex;flex-direction:column;gap:8px}
+.frame{position:relative;width:100%;aspect-ratio:3/4;max-height:420px;background:#e9efee;border-radius:12px;overflow:hidden;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px;text-align:center;padding:10px}
+.frame canvas{max-width:100%;max-height:100%;display:block;border-radius:6px}
+.frame .ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:16px;line-height:1.6}
+.btns{display:flex;gap:8px;flex-wrap:wrap}
+.btn{appearance:none;-webkit-appearance:none;border:1px solid var(--teal);background:var(--card);color:var(--teal-deep);border-radius:12px;font:inherit;font-size:15px;font-weight:600;padding:12px 14px;min-height:46px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;flex:1 1 120px;text-align:center;position:relative}
+.btn:active{transform:translateY(1px)}
+.btn.primary{background:var(--teal);color:#fff}
+.btn.primary:disabled,.btn:disabled{opacity:.45;cursor:default}
+.btn.quiet{border-color:var(--line);color:var(--muted);font-weight:500}
+.btn.danger{border-color:var(--danger);color:var(--danger)}
+.btn.danger.armed{background:var(--danger);color:#fff}
+.btn input[type=file]{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:0}
+.btn:focus-within,.btn:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+details.after-wrap{border-top:1px dashed var(--line);padding-top:10px}
+details.after-wrap summary{cursor:pointer;font-size:14px;font-weight:600;color:var(--warn);list-style:none;min-height:36px;display:flex;align-items:center}
+details.after-wrap summary::-webkit-details-marker{display:none}
+details.after-wrap summary::before{content:"＋";margin-right:6px}
+details.after-wrap[open] summary::before{content:"－"}
+.tips{margin:0;padding-left:1.2em;font-size:13px;color:var(--muted)}
+.tips li{margin:2px 0}
+.status{font-size:13px;border-radius:10px;padding:10px 12px;background:var(--paper);color:var(--muted);line-height:1.6}
+.status.ok{background:var(--teal-soft);color:var(--teal-deep)}
+.status.err{background:#f9e6e3;color:var(--danger)}
+.status.busy{background:var(--gold-soft);color:var(--warn)}
+.results{display:grid;gap:16px;grid-template-columns:1fr}
+.res-card{border:1px solid var(--line);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.res-card canvas{width:100%;height:auto;border-radius:10px;background:#e9efee;display:block}
+.legend{font-size:12px;color:var(--muted)}
+.metric{border-top:1px solid var(--line);padding-top:8px}
+.metric:first-of-type{border-top:0;padding-top:0}
+.metric b{font-size:14px}
+.metric .d{font-size:12px;color:var(--muted)}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:600;color:var(--teal-deep)}
+textarea,input[type=text],input[type=date]{font:inherit;font-size:16px;color:var(--ink);background:#fbfcfc;border:1px solid var(--line);border-radius:10px;padding:10px 12px;width:100%;line-height:1.6;min-width:0}
+textarea{resize:vertical;min-height:72px}
+textarea:focus,input:focus{outline:3px solid var(--gold);outline-offset:1px}
+.edit-group{display:flex;flex-direction:column;gap:12px;border:1px solid var(--line);border-radius:14px;padding:12px}
+.chk{display:flex;gap:10px;align-items:center;font-size:14px;min-height:40px}
+.chk input{width:22px;height:22px;accent-color:var(--teal)}
+.preview{display:flex;flex-direction:column;gap:12px;align-items:center}
+.preview img{width:100%;max-width:420px;height:auto;border:1px solid var(--line);border-radius:10px;-webkit-touch-callout:default;user-select:auto;-webkit-user-select:auto}
+.note{background:var(--gold-soft);border-radius:12px;padding:12px 14px;font-size:13px;line-height:1.7;color:#5b4410}
+.note ul{margin:6px 0 0;padding-left:1.2em}
+.engine-line{display:flex;gap:8px;align-items:center;font-size:12px;color:var(--muted)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--line);flex:none}
+.dot.ok{background:var(--teal)}.dot.busy{background:var(--gold)}.dot.err{background:var(--danger)}
+@media (min-width:560px){.views{grid-template-columns:1fr 1fr}.results{grid-template-columns:1fr 1fr}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#b8923a" d="M12 1.8l2.9 6.6 7.1.7-5.4 4.7 1.6 7-6.2-3.7-6.2 3.7 1.6-7L2 9.1l7.1-.7z"/></svg>
+      STARカイロプラクティック&amp;ビューティー
+    </div>
+    <h1>姿勢分析レポート作成</h1>
+    <p class="lead">側面・後ろ姿の写真から、姿勢の特徴を1枚の画像にまとめます。</p>
+  </header>
+
+  <div class="privacy">
+    写真と分析結果はこの端末の中だけで処理します。外部のサーバーやAIサービスへ送信せず、自動では保存しません。保存・共有はスタッフがボタンを押したときだけ実行します。
+  </div>
+
+  <!-- 1 -->
+  <section class="step" id="step1">
+    <div class="step-head"><span class="step-no">手順 1</span><h2>写真を用意する</h2></div>
+    <ul class="tips">
+      <li>頭からくるぶしまで、全身が写るようにします。</li>
+      <li>体の線が分かる服装で、壁など背景がすっきりした場所が向いています。</li>
+      <li>カメラは腰の高さくらいで、まっすぐ構えます。</li>
+      <li>正面は不要です。側面か後ろ姿のどちらか一方だけでも作成できます。</li>
+    </ul>
+    <div class="views" id="views"></div>
+  </section>
+
+  <!-- 2 -->
+  <section class="step" id="step2">
+    <div class="step-head"><span class="step-no">手順 2</span><h2>姿勢分析を実行する</h2></div>
+    <div class="engine-line"><span class="dot" id="engDot"></span><span id="engText">検出エンジン：初回の分析時に読み込みます</span></div>
+    <button class="btn primary" id="runBtn" type="button" disabled>姿勢分析を実行</button>
+    <div class="status" id="runStatus" role="status" aria-live="polite">写真を選ぶと実行できます。</div>
+  </section>
+
+  <!-- 3 -->
+  <section class="step" id="step3" hidden>
+    <div class="step-head"><span class="step-no">手順 3</span><h2>分析結果と写真を確認する</h2></div>
+    <p class="muted">白い丸は検出した身体の目印、金色の点線は基準線です。検出が合っていない場合は、撮り直して再度分析してください。</p>
+    <div class="results" id="results"></div>
+  </section>
+
+  <!-- 4 -->
+  <section class="step" id="step4" hidden>
+    <div class="step-head"><span class="step-no">手順 4</span><h2>文章を確認・編集する</h2></div>
+    <p class="muted">自動で作った文章です。お客様にお渡しする前に、必要に応じて直してください。</p>
+    <div id="editArea" style="display:flex;flex-direction:column;gap:14px"></div>
+    <div class="edit-group">
+      <label class="f" for="dateInput">分析日
+        <input type="date" id="dateInput">
+      </label>
+      <label class="chk" for="nameChk"><input type="checkbox" id="nameChk">お名前をレポートに載せる（初期設定は載せません）</label>
+      <label class="f" for="nameInput" id="nameWrap" hidden>お名前（敬称は自動で付きます）
+        <input type="text" id="nameInput" autocomplete="off" placeholder="例：山田 花子">
+      </label>
+    </div>
+  </section>
+
+  <!-- 5 -->
+  <section class="step" id="step5" hidden>
+    <div class="step-head"><span class="step-no">手順 5</span><h2>レポート画像を作成して共有する</h2></div>
+    <button class="btn primary" id="makeBtn" type="button">レポート画像を作成</button>
+    <div class="status" id="makeStatus" role="status" aria-live="polite" hidden></div>
+    <div class="preview" id="previewBox" hidden>
+      <img id="previewImg" alt="作成したレポート画像のプレビュー">
+      <div class="btns" style="width:100%;max-width:420px">
+        <button class="btn primary" id="saveBtn" type="button">画像を保存</button>
+        <button class="btn primary" id="shareBtn" type="button">共有する</button>
+      </div>
+      <div class="status" id="shareStatus" role="status" aria-live="polite" hidden></div>
+      <div class="note" style="width:100%;max-width:420px">
+        <b>保存・共有のしかた</b>
+        <ul>
+          <li>「共有する」を押すと共有画面が開きます。LINEを選んで送信するか、「画像を保存」で写真アプリに入れられます。</li>
+          <li>共有画面が出ない場合は、上の画像を長押しして「写真に追加」を選び、保存してからLINEなどで送ってください。</li>
+          <li>送信できたかどうかは、このアプリでは確認できません。LINEの画面でご確認ください。</li>
+        </ul>
+      </div>
+      <div class="note" style="width:100%;max-width:420px">
+        <b>保存・共有したあとの画像について</b>
+        <ul>
+          <li>保存した画像は、お使いのiPhoneの「写真」または「ファイル」に残ります。お渡しが済んだら、不要であれば削除してください（写真アプリは「最近削除した項目」からも削除すると完全に消えます）。</li>
+          <li>LINEで送った画像は、お客様とのトーク履歴に残ります。送り先をよく確認してください。</li>
+          <li>このアプリは、画像を外部へ自動で送ったり保存したりしません。リセットすると、元の写真・分析データ・作成した画像はこの画面から消えます。</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 8 -->
+  <section class="step" id="step8">
+    <div class="step-head"><span class="step-no">最後に</span><h2>次のお客様へ</h2></div>
+    <p class="muted">元の写真、分析データ、作成した画像、入力した文章とお名前をすべて消去して、最初の状態に戻ります。</p>
+    <button class="btn danger" id="resetBtn" type="button">消去して次のお客様へ</button>
+  </section>
+</div>
+
+<script>
+'use strict';
+/* =========================================================
+   定数・状態
+   ========================================================= */
+const STORE_NAME = 'STARカイロプラクティック&ビューティー';
+const DISCLAIMER = '本レポートは撮影した写真から姿勢の特徴を確認するための参考資料です。医学的な診断を行うものではありません。撮影条件などにより見え方が異なる場合があります。';
+const MAX_SIDE = 1440; // 解析・表示用に縮小する長辺(px)
+const ENGINE_BASES = [
+  './vendor/mediapipe-pose/',
+  'https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/'
+];
+const FONT_SANS = '"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP","Noto Sans CJK JP","Yu Gothic",sans-serif';
+const FONT_SERIF = '"Hiragino Mincho ProN","Yu Mincho","Noto Serif JP","Noto Serif CJK JP",serif';
+
+const VIEWS = [
+  { key: 'side', title: '側面', hint: '体の横から、全身が入るように撮影します。' },
+  { key: 'back', title: '後ろ姿', hint: '背中側から、全身が入るように撮影します。' }
+];
+
+const state = {
+  photos: {},      // 'side-before' | 'side-after' | 'back-before' | 'back-after' -> photo
+  analyzed: false,
+  explanation: '',
+  cmpNote: '',
+  reportUrl: null,
+  reportCanvas: null,
+  busy: false
+};
+const $ = (id) => document.getElementById(id);
+const slotKey = (v, w) => v + '-' + w;
+
+/* =========================================================
+   画面の組み立て（手順1）
+   ========================================================= */
+const slotEls = {};
+function buildSlots() {
+  const box = $('views');
+  VIEWS.forEach((v) => {
+    const card = document.createElement('div');
+    card.className = 'view-card';
+    const h = document.createElement('h3');
+    h.innerHTML = '<span></span><span class="tag">任意の1方向でOK</span>';
+    h.firstChild.textContent = v.title;
+    card.appendChild(h);
+    const hint = document.createElement('p'); hint.className = 'muted'; hint.textContent = v.hint; card.appendChild(hint);
+    card.appendChild(makeSlot(v.key, 'before', '写真'));
+    const det = document.createElement('details'); det.className = 'after-wrap'; det.id = 'after-' + v.key;
+    const sm = document.createElement('summary'); sm.textContent = '施術後の写真を追加（前後を比べる場合）'; det.appendChild(sm);
+    const note = document.createElement('p'); note.className = 'muted'; note.textContent = '上の写真が「施術前」、こちらが「施術後」としてレポートに載ります。同じ場所・同じ距離で撮ると比べやすくなります。'; det.appendChild(note);
+    det.appendChild(makeSlot(v.key, 'after', '施術後の写真'));
+    card.appendChild(det);
+    box.appendChild(card);
+  });
+}
+function makeSlot(view, when, label) {
+  const key = slotKey(view, when);
+  const wrap = document.createElement('div'); wrap.className = 'slot';
+  const frame = document.createElement('div'); frame.className = 'frame';
+  const ph = document.createElement('div'); ph.className = 'ph'; ph.textContent = label + 'は未選択です'; frame.appendChild(ph);
+  const cv = document.createElement('canvas'); cv.hidden = true; frame.appendChild(cv);
+  wrap.appendChild(frame);
+  const btns = document.createElement('div'); btns.className = 'btns';
+  const cam = fileButton('撮影する', true, key);
+  const pick = fileButton('写真を選ぶ', false, key);
+  const clr = document.createElement('button'); clr.type = 'button'; clr.className = 'btn quiet'; clr.textContent = '削除'; clr.hidden = true;
+  clr.addEventListener('click', () => removePhoto(key));
+  btns.append(cam, pick, clr);
+  wrap.appendChild(btns);
+  slotEls[key] = { frame, ph, cv, clr, label };
+  return wrap;
+}
+function fileButton(text, capture, key) {
+  const l = document.createElement('label'); l.className = 'btn';
+  l.appendChild(document.createTextNode(text));
+  const i = document.createElement('input'); i.type = 'file'; i.accept = 'image/*';
+  if (capture) i.setAttribute('capture', 'environment');
+  i.setAttribute('aria-label', text);
+  i.addEventListener('change', () => { if (i.files && i.files[0]) loadPhoto(key, i.files[0]); i.value = ''; });
+  l.appendChild(i);
+  return l;
+}
+
+/* =========================================================
+   写真の読み込み（端末内で縮小。外部へは送らない）
+   ========================================================= */
+function loadPhoto(key, file) {
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+  img.onload = () => {
+    let w = img.naturalWidth, h = img.naturalHeight;
+    const s = Math.min(1, MAX_SIDE / Math.max(w, h));
+    w = Math.round(w * s); h = Math.round(h * s);
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
+    c.getContext('2d').drawImage(img, 0, 0, w, h);
+    URL.revokeObjectURL(url);
+    img.src = '';
+    state.photos[key] = { canvas: c, W: w, H: h, status: 'new', lms: null, analysis: null };
+    paintSlot(key);
+    invalidateAnalysis();
+    ensureEngine().catch(() => {});
+  };
+  img.onerror = () => { URL.revokeObjectURL(url); setRun('この写真を読み込めませんでした。別の写真でお試しください。', 'err'); };
+  img.src = url;
+}
+function removePhoto(key) {
+  const p = state.photos[key];
+  if (p) { p.canvas.width = 0; p.canvas.height = 0; }
+  delete state.photos[key];
+  paintSlot(key);
+  invalidateAnalysis();
+}
+function paintSlot(key) {
+  const s = slotEls[key]; const p = state.photos[key];
+  if (!p) { s.cv.hidden = true; s.cv.width = 0; s.cv.height = 0; s.ph.hidden = false; s.clr.hidden = true; return; }
+  s.cv.width = p.W; s.cv.height = p.H;
+  const ctx = s.cv.getContext('2d');
+  ctx.drawImage(p.canvas, 0, 0);
+  if (p.status === 'ok' && p.analysis) drawOverlay(ctx, p.analysis, 1 / Math.max(1, p.W / 400));
+  s.cv.hidden = false; s.ph.hidden = true; s.clr.hidden = false;
+}
+function invalidateAnalysis() {
+  state.analyzed = false;
+  Object.values(state.photos).forEach((p) => { p.status = p.status === 'ok' || p.status === 'none' ? 'new' : p.status; });
+  ['step3', 'step4', 'step5'].forEach((id) => { $(id).hidden = true; });
+  clearReportPreview();
+  Object.keys(slotEls).forEach((k) => { if (state.photos[k]) paintSlot(k); });
+  const has = Object.keys(state.photos).some((k) => k.endsWith('-before'));
+  $('runBtn').disabled = !has || state.busy;
+  setRun(has ? '「姿勢分析を実行」を押してください。' : '写真を選ぶと実行できます。', '');
+}
+
+/* =========================================================
+   検出エンジン（MediaPipe Pose：端末内のWebAssemblyで実行）
+   ========================================================= */
+let engine = null, enginePromise = null;
+function setEngine(kind, text) {
+  $('engDot').className = 'dot ' + kind;
+  $('engText').textContent = '検出エンジン：' + text;
+}
+function loadScript(src) {
+  return new Promise((res, rej) => {
+    const s = document.createElement('script'); s.src = src; s.async = true;
+    s.onload = res; s.onerror = () => rej(new Error('load failed: ' + src));
+    document.head.appendChild(s);
+  });
+}
+function ensureEngine() {
+  if (engine) return Promise.resolve(engine);
+  if (enginePromise) return enginePromise;
+  setEngine('busy', '読み込み中（初回のみ・数十秒かかることがあります）');
+  enginePromise = (async () => {
+    let lastErr = null;
+    const bases = window.Pose ? [''] : ENGINE_BASES;
+    for (const base of bases) {
+      try {
+        if (!window.Pose) await loadScript(base + 'pose.js');
+        if (!window.Pose) throw new Error('Pose class missing');
+        const pose = new window.Pose({ locateFile: (f) => base + f });
+        pose.setOptions({ modelComplexity: 1, smoothLandmarks: false, enableSegmentation: false, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5, selfieMode: false });
+        await Promise.race([pose.initialize(), new Promise((_, rej) => setTimeout(() => rej(new Error('initialize timeout')), 90000))]);
+        engine = pose;
+        setEngine('ok', '準備できました（この端末内で動作）');
+        return engine;
+      } catch (e) { lastErr = e; }
+    }
+    enginePromise = null;
+    setEngine('err', '読み込めませんでした');
+    const err = new Error('engine unavailable'); err.cause = lastErr; throw err;
+  })();
+  return enginePromise;
+}
+function detect(canvas) {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error('detect timeout')), 60000);
+    engine.onResults((r) => { clearTimeout(t); resolve(r); });
+    Promise.resolve(engine.send({ image: canvas })).catch((e) => { clearTimeout(t); reject(e); });
+  });
+}
+
+/* =========================================================
+   姿勢の計算（検出できた目印だけを使う。推測で埋めない）
+   ========================================================= */
+const deg = (r) => r * 180 / Math.PI;
+function pt(lms, i, W, H) {
+  const l = lms && lms[i]; if (!l) return null;
+  const v = l.visibility == null ? 1 : l.visibility;
+  if (v < 0.5 || l.x < 0 || l.x > 1 || l.y < 0 || l.y > 1) return null;
+  return { x: l.x * W, y: l.y * H };
+}
+const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+const pct = (v) => Math.round(Math.abs(v) * 100);
+const NA = (key, label, noun) => ({ key, label, noun, level: null, text: '判定できませんでした。', detail: '', val: null, mag: null, unit: '' });
+
+function analyzeSide(lms, W, H) {
+  const items = [];
+  // 写っている側（見えている度合いが高い側）を選ぶ
+  const vis = (i) => (lms && lms[i] && lms[i].visibility != null ? lms[i].visibility : 0);
+  const sets = { L: { ear: 7, sh: 11, hip: 23, kn: 25, an: 27, heel: 29, toe: 31 }, R: { ear: 8, sh: 12, hip: 24, kn: 26, an: 28, heel: 30, toe: 32 } };
+  const score = (s) => ['ear', 'sh', 'hip', 'kn', 'an'].reduce((a, k) => a + vis(sets[s][k]), 0);
+  const side = lms ? (score('L') >= score('R') ? 'L' : 'R') : 'L';
+  const ix = sets[side];
+  const P = {};
+  ['ear', 'sh', 'hip', 'kn', 'an', 'heel', 'toe'].forEach((k) => { P[k] = pt(lms, ix[k], W, H); });
+  const nose = pt(lms, 0, W, H);
+  let dir = 0;
+  if (nose && P.ear && Math.abs(nose.x - P.ear.x) > 0.004 * W) dir = Math.sign(nose.x - P.ear.x);
+  else if (P.toe && P.heel && Math.abs(P.toe.x - P.heel.x) > 0.004 * W) dir = Math.sign(P.toe.x - P.heel.x);
+  const torso = P.sh && P.hip ? dist(P.sh, P.hip) : null;
+
+  // 1 頭と肩
+  if (P.ear && P.sh && torso && dir) {
+    const v = dir * (P.ear.x - P.sh.x) / torso;
+    let level, text;
+    if (v < -0.05) { level = 1; text = '耳が肩の真上より、やや後ろ寄りに見えます。'; }
+    else if (v < 0.10) { level = 0; text = '耳が肩のほぼ真上に位置して見えます。'; }
+    else if (v < 0.22) { level = 1; text = '耳が肩より、やや前に位置して見えます。'; }
+    else { level = 2; text = '耳が肩より、前に位置して見えます。'; }
+    items.push({ key: 'head', label: '頭と肩の位置', noun: 'ずれ', level, text, detail: '耳と肩の前後の差：胴体の長さの約' + pct(v) + '%', val: v, mag: Math.abs(v), unit: '%' });
+  } else items.push(NA('head', '頭と肩の位置', 'ずれ'));
+
+  // 2 上半身の傾き（肩と腰を結ぶ線の、垂直からの角度。前が＋）
+  if (P.sh && P.hip && dir) {
+    const a = deg(Math.atan2(dir * (P.sh.x - P.hip.x), P.hip.y - P.sh.y));
+    const m = Math.abs(a); let level, text;
+    if (m < 3) { level = 0; text = '上半身は、ほぼまっすぐ立っているように見えます。'; }
+    else { level = m < 8 ? 1 : 2; text = '上半身が、' + (m < 8 ? 'わずかに' : '') + (a > 0 ? '前へ' : '後ろへ') + '傾いて見えます。'; }
+    items.push({ key: 'lean', label: '上半身の前後の傾き', noun: '傾き', level, text, detail: '肩と腰を結ぶ線の傾き：約' + m.toFixed(1) + '°（' + (a >= 0 ? '前' : '後ろ') + '向き）', val: a, mag: m, unit: '°' });
+  } else items.push(NA('lean', '上半身の前後の傾き', '傾き'));
+
+  // 3 肩・腰とくるぶしの位置関係
+  if (P.an && P.sh && P.hip && torso && dir) {
+    const o = dir * ((P.sh.x - P.an.x) + (P.hip.x - P.an.x)) / 2 / torso;
+    const m = Math.abs(o); let level, text;
+    if (m < 0.10) { level = 0; text = '肩と腰が、くるぶしの真上付近にそろって見えます。'; }
+    else { level = m < 0.20 ? 1 : 2; text = '肩と腰が、くるぶしの真上より' + (m < 0.20 ? 'やや' : '') + (o > 0 ? '前寄り' : '後ろ寄り') + 'に見えます。'; }
+    items.push({ key: 'axis', label: '体の前後のバランス', noun: 'ずれ', level, text, detail: '肩・腰とくるぶしの前後の差：胴体の長さの約' + pct(o) + '%', val: o, mag: m, unit: '%' });
+  } else items.push(NA('axis', '体の前後のバランス', 'ずれ'));
+
+  return { view: 'side', items, geom: { P, dir }, ref: torso ? torso / H : null };
+}
+
+function pairByX(a, b) { // 画像の左にある点を left に
+  if (!a || !b) return null;
+  return a.x <= b.x ? { left: a, right: b } : { left: b, right: a };
+}
+function analyzeBack(lms, W, H) {
+  const P = {
+    sh: pairByX(pt(lms, 11, W, H), pt(lms, 12, W, H)),
+    hip: pairByX(pt(lms, 23, W, H), pt(lms, 24, W, H)),
+    ear: pairByX(pt(lms, 7, W, H), pt(lms, 8, W, H)),
+    an: pairByX(pt(lms, 27, W, H), pt(lms, 28, W, H))
+  };
+  const items = [];
+  // 後ろ姿では、写真の左側がお客様の右側
+  const tilt = (pair, key, label, partName) => {
+    if (!pair) return NA(key, label, '差');
+    const dx = pair.right.x - pair.left.x;
+    if (dx < 8) return NA(key, label, '差');
+    const a = deg(Math.atan2(pair.right.y - pair.left.y, dx)); // ＋なら写真右が低い＝お客様の右が高い
+    const m = Math.abs(a); let level, text;
+    if (m < 1.5) { level = 0; text = '左右の' + partName + 'の高さは、ほぼそろって見えます。'; }
+    else { level = m < 4 ? 1 : 2; text = (a > 0 ? 'お客様の右' : 'お客様の左') + partName + 'が、' + (m < 4 ? 'わずかに' : '') + '高く見えます。'; }
+    return { key, label, noun: '差', level, text, detail: '左右を結ぶ線の傾き：約' + m.toFixed(1) + '°', val: a, mag: m, unit: '°' };
+  };
+  items.push(tilt(P.sh, 'shoulder', '左右の肩の高さ', '肩'));
+  items.push(tilt(P.hip, 'pelvis', '左右の骨盤付近の高さ', '腰（骨盤付近）'));
+  items.push(tilt(P.ear, 'ears', '左右の耳の高さ', '耳'));
+
+  const width = P.sh ? P.sh.right.x - P.sh.left.x : (P.hip ? P.hip.right.x - P.hip.left.x : 0);
+  const mid = (pr) => ({ x: (pr.left.x + pr.right.x) / 2, y: (pr.left.y + pr.right.y) / 2 });
+  const centerItem = (pair, key, label, what) => {
+    if (!pair || !P.an || width < 20) return NA(key, label, 'ずれ');
+    const o = (mid(pair).x - mid(P.an).x) / width; // ＋なら写真右＝お客様の左へ寄る
+    const m = Math.abs(o); let level, text;
+    if (m < 0.08) { level = 0; text = what + 'の中心が、足元の中心のほぼ真上に見えます。'; }
+    else { level = m < 0.18 ? 1 : 2; text = what + 'の中心が、足元の中心より' + (o > 0 ? 'お客様の左側' : 'お客様の右側') + (m < 0.18 ? 'へ、わずかに' : 'へ') + '寄って見えます。'; }
+    return { key, label, noun: 'ずれ', level, text, detail: '足元の中心との左右の差：肩幅の約' + pct(o) + '%', val: o, mag: m, unit: '%' };
+  };
+  items.push(centerItem(P.ear, 'cHead', '頭の中心の位置', '頭'));
+  items.push(centerItem(P.hip, 'cHip', '腰の中心の位置', '腰'));
+  return { view: 'back', items, geom: { P }, ref: width ? width / W : null };
+}
+
+function analyzeLandmarks(view, lms, W, H) {
+  return view === 'side' ? analyzeSide(lms, W, H) : analyzeBack(lms, W, H);
+}
+
+/* =========================================================
+   オーバーレイ（検出した目印と基準線）
+   ctx は写真ピクセル座標。k は「画面1pxあたりの写真ピクセル数」
+   ========================================================= */
+const COL_LINE = '#1f6f6b', COL_REF = '#d8a93f';
+function dashed(ctx, a, b, k) {
+  ctx.save(); ctx.strokeStyle = COL_REF; ctx.lineWidth = 3.5 * k; ctx.setLineDash([14 * k, 9 * k]); ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); ctx.restore();
+}
+function solid(ctx, a, b, k) {
+  ctx.save(); ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 8 * k; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+  ctx.strokeStyle = COL_LINE; ctx.lineWidth = 4.5 * k;
+  ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); ctx.restore();
+}
+function dot(ctx, p, k) {
+  ctx.save(); ctx.fillStyle = '#ffffff'; ctx.strokeStyle = COL_LINE; ctx.lineWidth = 3.5 * k;
+  ctx.beginPath(); ctx.arc(p.x, p.y, 8 * k, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); ctx.restore();
+}
+function tag(ctx, text, x, y, align, k, W) {
+  ctx.save(); ctx.font = '600 ' + (22 * k) + 'px ' + FONT_SANS; ctx.textAlign = align; ctx.textBaseline = 'middle';
+  ctx.lineJoin = 'round'; ctx.lineWidth = 6 * k; ctx.strokeStyle = 'rgba(255,255,255,.95)'; ctx.fillStyle = '#17504d';
+  const w = ctx.measureText(text).width;
+  if (align === 'right' && x - w < 4 * k) { align = 'left'; x = 6 * k; ctx.textAlign = 'left'; }
+  if (align === 'left' && x + w > W - 4 * k) { align = 'right'; x = W - 6 * k; ctx.textAlign = 'right'; }
+  ctx.strokeText(text, x, y); ctx.fillText(text, x, y); ctx.restore();
+}
+function drawOverlay(ctx, an, k) {
+  const W = ctx.canvas.width;
+  if (an.view === 'side') {
+    const { P, dir } = an.geom;
+    const order = ['ear', 'sh', 'hip', 'kn', 'an'];
+    const have = order.filter((n) => P[n]);
+    if (P.an) {
+      const top = Math.min(...have.map((n) => P[n].y)) - 50 * k;
+      dashed(ctx, { x: P.an.x, y: top }, { x: P.an.x, y: P.an.y + 30 * k }, k);
+    }
+    for (let i = 0; i < have.length - 1; i++) {
+      const a = P[have[i]], b = P[have[i + 1]];
+      if (order.indexOf(have[i + 1]) - order.indexOf(have[i]) === 1) solid(ctx, a, b, k); // 隣どうしだけ結ぶ
+    }
+    const names = { ear: '耳', sh: '肩', hip: '腰', kn: 'ひざ', an: 'くるぶし' };
+    have.forEach((n) => { dot(ctx, P[n], k); tag(ctx, names[n], P[n].x - (dir || -1) * 16 * k, P[n].y, (dir || -1) > 0 ? 'right' : 'left', k, W); });
+  } else {
+    const { P } = an.geom;
+    const mid = (pr) => ({ x: (pr.left.x + pr.right.x) / 2, y: (pr.left.y + pr.right.y) / 2 });
+    [['sh', '肩'], ['hip', '腰'], ['ear', '耳']].forEach(([n, nm]) => {
+      const pr = P[n]; if (!pr) return;
+      const m = mid(pr), half = Math.max(70 * k, (pr.right.x - pr.left.x) * 0.9);
+      dashed(ctx, { x: m.x - half, y: m.y }, { x: m.x + half, y: m.y }, k);
+      solid(ctx, pr.left, pr.right, k);
+      dot(ctx, pr.left, k); dot(ctx, pr.right, k);
+      tag(ctx, '右' + nm, pr.left.x - 14 * k, pr.left.y - 18 * k, 'right', k, W);
+      tag(ctx, '左' + nm, pr.right.x + 14 * k, pr.right.y - 18 * k, 'left', k, W);
+    });
+    if (P.an) {
+      const m = mid(P.an);
+      const ys = ['ear', 'sh', 'hip'].filter((n) => P[n]).map((n) => mid(P[n]).y);
+      const top = (ys.length ? Math.min(...ys) : m.y - 300 * k) - 70 * k;
+      dashed(ctx, { x: m.x, y: top }, { x: m.x, y: m.y + 30 * k }, k);
+      dot(ctx, P.an.left, k); dot(ctx, P.an.right, k);
+    }
+  }
+}
+
+/* =========================================================
+   分析の実行（手順2）
+   ========================================================= */
+function setRun(msg, kind) { const e = $('runStatus'); e.textContent = msg; e.className = 'status' + (kind ? ' ' + kind : ''); }
+async function runAnalysis() {
+  if (state.busy) return;
+  const keys = Object.keys(state.photos).filter((k) => k.endsWith('-before') || state.photos[k.replace('-after', '-before')]);
+  if (!keys.length) return;
+  state.busy = true; $('runBtn').disabled = true;
+  try {
+    setRun('検出エンジンを準備しています…', 'busy');
+    try { await ensureEngine(); }
+    catch (e) {
+      setRun('検出エンジンを読み込めませんでした。インターネットに接続しているか確認して、もう一度お試しください。自動検出ができない状態では、分析結果は作成しません（手動の線引きで代用することはしません）。', 'err');
+      return;
+    }
+    let n = 0;
+    for (const k of keys) {
+      n++; setRun('分析しています… (' + n + '/' + keys.length + ')', 'busy');
+      const p = state.photos[k]; const view = k.split('-')[0];
+      let lms = null;
+      try { const r = await detect(p.canvas); lms = r && r.poseLandmarks ? r.poseLandmarks : null; }
+      catch (e) { lms = null; }
+      try { engine.reset && engine.reset(); } catch (e) { /* noop */ }
+      p.lms = lms;
+      p.analysis = analyzeLandmarks(view, lms, p.W, p.H);
+      p.status = lms ? 'ok' : 'none';
+      await new Promise((r) => setTimeout(r, 0));
+    }
+    state.analyzed = true;
+    keys.forEach((k) => paintSlot(k));
+    buildResults(); buildEditors();
+    ['step3', 'step4', 'step5'].forEach((id) => { $(id).hidden = false; });
+    const failed = keys.filter((k) => state.photos[k].status === 'none').length;
+    setRun(failed ? '分析が終わりました。人物を検出できなかった写真が' + failed + '枚あります。全身が写るように撮り直してください。' : '分析が終わりました。結果を確認してください。', failed ? 'err' : 'ok');
+    $('step3').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } finally {
+    state.busy = false; $('runBtn').disabled = !Object.keys(state.photos).some((k) => k.endsWith('-before'));
+  }
+}
+
+/* =========================================================
+   結果の表示（手順3）と文章の編集（手順4）
+   ========================================================= */
+const whenLabel = (k, hasAfter) => (k.endsWith('-after') ? '施術後' : hasAfter ? '施術前' : '');
+function hasAfter(view) { return !!(state.photos[view + '-before'] && state.photos[view + '-after']); }
+function buildResults() {
+  const box = $('results'); box.textContent = '';
+  VIEWS.forEach((v) => {
+    ['before', 'after'].forEach((w) => {
+      const k = slotKey(v.key, w); const p = state.photos[k];
+      if (!p || !p.analysis) return;
+      const card = document.createElement('div'); card.className = 'res-card';
+      const h = document.createElement('h3'); h.textContent = v.title + (whenLabel(k, hasAfter(v.key)) ? '（' + whenLabel(k, hasAfter(v.key)) + '）' : ''); card.appendChild(h);
+      const cv = document.createElement('canvas'); cv.width = p.W; cv.height = p.H;
+      const ctx = cv.getContext('2d'); ctx.drawImage(p.canvas, 0, 0);
+      if (p.status === 'ok') drawOverlay(ctx, p.analysis, 1 / Math.max(1, p.W / 400));
+      card.appendChild(cv);
+      if (p.status !== 'ok') {
+        const s = document.createElement('div'); s.className = 'status err'; s.textContent = '人物の身体を検出できませんでした。全身が写るように、明るい場所で撮り直してください。'; card.appendChild(s);
+      }
+      if (v.key === 'back') { const l = document.createElement('p'); l.className = 'legend'; l.textContent = '後ろ姿では、写真の左側がお客様の右側です。'; card.appendChild(l); }
+      p.analysis.items.forEach((it) => {
+        const m = document.createElement('div'); m.className = 'metric';
+        const b = document.createElement('b'); b.textContent = it.label; m.appendChild(b);
+        const t = document.createElement('div'); t.textContent = it.text; m.appendChild(t);
+        if (it.detail) { const d = document.createElement('div'); d.className = 'd'; d.textContent = it.detail; m.appendChild(d); }
+        card.appendChild(m);
+      });
+      box.appendChild(card);
+    });
+  });
+}
+
+function overall(view) { // 目立つ特徴の文章を作る
+  const p = state.photos[view + '-before']; if (!p || !p.analysis) return null;
+  const items = p.analysis.items;
+  const notable = items.filter((i) => i.level >= 1).map((i) => i.text);
+  const unknown = items.filter((i) => i.level === null).length;
+  return { notable, unknown, allUnknown: unknown === items.length };
+}
+function buildExplanation() {
+  const out = [];
+  const parts = [];
+  VIEWS.forEach((v) => {
+    const o = overall(v.key); if (!o) return;
+    if (o.allUnknown) { parts.push('【' + v.title + '】写真から確認できる項目がありませんでした。'); return; }
+    parts.push('【' + v.title + 'の写真から】' + (o.notable.length ? o.notable.join('') : '大きな左右差や前後のずれは、目立って見えませんでした。'));
+  });
+  out.push('今回の写真から、次のような特徴が見られました。');
+  out.push(parts.join('\n'));
+  const anyUnknown = VIEWS.some((v) => { const o = overall(v.key); return o && !o.allUnknown && o.unknown > 0; });
+  if (anyUnknown) out.push('写真から判定できなかった項目は、掲載していません。');
+  out.push('普段の立ち姿を意識して見比べると、変化に気づきやすくなります。この内容は写真から確認できた見え方であり、体の状態を断定するものではありません。気になる点は、施術のときにお気軽にご相談ください。');
+  return out.join('\n');
+}
+
+function buildComparison(view) {
+  const b = state.photos[view + '-before'], a = state.photos[view + '-after'];
+  if (!b || !a || !b.analysis || !a.analysis) return null;
+  const rows = [];
+  b.analysis.items.forEach((ib) => {
+    const ia = a.analysis.items.find((x) => x.key === ib.key);
+    const fmt = (it) => (it.unit === '°' ? it.mag.toFixed(1) + '°' : '約' + Math.round(it.mag * 100) + '%');
+    if (!ia || ib.mag == null || ia.mag == null) {
+      rows.push({ label: ib.label, before: ib.mag == null ? '判定できませんでした' : fmt(ib), after: !ia || ia.mag == null ? '判定できませんでした' : fmt(ia), change: '比較できませんでした。' });
+      return;
+    }
+    const noise = ib.unit === '°' ? 1.0 : 0.03;
+    const d = ia.mag - ib.mag;
+    let change;
+    if (Math.abs(d) < noise) change = '大きな変化は確認できませんでした。';
+    else change = d < 0 ? '施術前より、' + ib.noun + 'が小さく写っています。' : '施術前より、' + ib.noun + 'が大きく写っています。';
+    rows.push({ label: ib.label, before: fmt(ib), after: fmt(ia), change });
+  });
+  const notes = [];
+  const ra = a.analysis.ref, rb = b.analysis.ref;
+  if (ra && rb && Math.abs(ra - rb) / rb > 0.25) notes.push('2枚の写真で体の大きさが違って写っているため、撮影距離が異なり、比較が難しい可能性があります。');
+  return { view, rows, extra: notes.join('') };
+}
+const CMP_NOTE_DEFAULT = '撮影の位置・距離・服装・姿勢のとり方によって、写真の見え方は変わります。この比較は写真上の見た目の違いを示すもので、痛みの改善や施術の効果を示すものではありません。';
+
+function areaLabel(text, id, rows) {
+  const l = document.createElement('label'); l.className = 'f'; l.setAttribute('for', id); l.textContent = text;
+  return l;
+}
+function ta(id, value, rows, onInput) {
+  const t = document.createElement('textarea'); t.id = id; t.value = value; t.rows = rows || 3;
+  t.addEventListener('input', () => { onInput(t.value); clearReportPreview(); autosize(t); });
+  setTimeout(() => autosize(t), 0);
+  return t;
+}
+function autosize(t) { t.style.height = 'auto'; t.style.height = Math.min(600, t.scrollHeight + 4) + 'px'; }
+
+function buildEditors() {
+  const area = $('editArea'); area.textContent = '';
+  // 要約（各項目）
+  VIEWS.forEach((v) => {
+    const p = state.photos[v.key + '-before']; if (!p || !p.analysis) return;
+    const g = document.createElement('div'); g.className = 'edit-group';
+    const h = document.createElement('h3'); h.textContent = v.title + 'の分析結果のまとめ'; g.appendChild(h);
+    p.analysis.items.forEach((it, i) => {
+      const id = 'ed-' + v.key + '-' + i;
+      g.appendChild(areaLabel(it.label, id));
+      g.appendChild(ta(id, it.text, 2, (val) => { it.text = val; }));
+    });
+    area.appendChild(g);
+  });
+  // 説明
+  state.explanation = buildExplanation();
+  const g2 = document.createElement('div'); g2.className = 'edit-group';
+  const h2 = document.createElement('h3'); h2.textContent = 'お客様向けの分かりやすい説明'; g2.appendChild(h2);
+  g2.appendChild(areaLabel('説明文', 'ed-expl'));
+  g2.appendChild(ta('ed-expl', state.explanation, 6, (val) => { state.explanation = val; }));
+  area.appendChild(g2);
+  // 比較
+  state.cmps = VIEWS.map((v) => buildComparison(v.key)).filter(Boolean);
+  if (state.cmps.length) {
+    state.cmpNote = CMP_NOTE_DEFAULT;
+    state.cmps.forEach((c) => {
+      const vt = VIEWS.find((v) => v.key === c.view).title;
+      const g = document.createElement('div'); g.className = 'edit-group';
+      const h = document.createElement('h3'); h.textContent = vt + '：施術前後の比較'; g.appendChild(h);
+      c.rows.forEach((r, i) => {
+        const id = 'ed-cmp-' + c.view + '-' + i;
+        g.appendChild(areaLabel(r.label + '（前 ' + r.before + ' → 後 ' + r.after + '）', id));
+        g.appendChild(ta(id, r.change, 2, (val) => { r.change = val; }));
+      });
+      if (c.extra) { const idx = 'ed-cmp-extra-' + c.view; g.appendChild(areaLabel('撮影条件についての補足', idx)); g.appendChild(ta(idx, c.extra, 2, (val) => { c.extra = val; })); }
+      area.appendChild(g);
+    });
+    const g3 = document.createElement('div'); g3.className = 'edit-group';
+    g3.appendChild(areaLabel('比較についての注意書き', 'ed-cmpnote'));
+    g3.appendChild(ta('ed-cmpnote', state.cmpNote, 4, (val) => { state.cmpNote = val; }));
+    area.appendChild(g3);
+  }
+  // 日付
+  const d = new Date(); const pad = (n) => String(n).padStart(2, '0');
+  $('dateInput').value = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+  clearReportPreview();
+}
+
+/* =========================================================
+   レポート画像の作成（Canvasで1枚に組み立てる。画面のスクリーンショットではない）
+   ========================================================= */
+const RW = 1080, RM = 48;
+const KINSOKU = '、。，．）」』】！？ー…ぁぃぅぇぉっゃゅょァィゥェォッャュョ,.)!?';
+function wrap(ctx, text, maxW) {
+  const lines = [];
+  String(text).split('\n').forEach((para) => {
+    let line = '';
+    for (const ch of para) {
+      const w = ctx.measureText(line + ch).width;
+      if (w > maxW && line && KINSOKU.indexOf(ch) < 0) { lines.push(line); line = ch; }
+      else line += ch;
+    }
+    lines.push(line);
+  });
+  return lines;
+}
+function para(ctx, text, x, y, maxW, font, color, lh) {
+  ctx.font = font; ctx.fillStyle = color; ctx.textBaseline = 'top'; ctx.textAlign = 'left';
+  const lines = wrap(ctx, text, maxW);
+  lines.forEach((l, i) => ctx.fillText(l, x, y + i * lh + (lh - parseInt(font.match(/(\d+)px/)[1], 10)) / 2));
+  return y + lines.length * lh;
+}
+function rr(ctx, x, y, w, h, r) {
+  ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+}
+function star(ctx, cx, cy, R, fill) {
+  ctx.save(); ctx.fillStyle = fill; ctx.beginPath();
+  for (let i = 0; i < 10; i++) { const r = i % 2 ? R * 0.42 : R; const a = -Math.PI / 2 + i * Math.PI / 5; ctx.lineTo(cx + r * Math.cos(a), cy + r * Math.sin(a)); }
+  ctx.closePath(); ctx.fill(); ctx.restore();
+}
+function photoBox(ctx, p, x, y, w, h) { // 枠の中に写真を収める（切り抜かない）
+  ctx.save(); rr(ctx, x, y, w, h, 20); ctx.fillStyle = '#e4ecea'; ctx.fill(); ctx.clip();
+  const s = Math.min(w / p.W, h / p.H); const dw = p.W * s, dh = p.H * s; const dx = x + (w - dw) / 2, dy = y + (h - dh) / 2;
+  ctx.drawImage(p.canvas, dx, dy, dw, dh);
+  if (p.status === 'ok' && p.analysis) { ctx.translate(dx, dy); ctx.scale(s, s); drawOverlay(ctx, p.analysis, 1.35 / s); }
+  ctx.restore();
+}
+function chip(ctx, text, x, y, bg, fg) {
+  ctx.font = '600 24px ' + FONT_SANS; const w = ctx.measureText(text).width + 36;
+  ctx.fillStyle = bg; rr(ctx, x, y, w, 44, 22); ctx.fill();
+  ctx.fillStyle = fg; ctx.textBaseline = 'middle'; ctx.textAlign = 'left'; ctx.fillText(text, x + 18, y + 23);
+  return w;
+}
+function sectionTitle(ctx, text, y) {
+  ctx.fillStyle = '#b8923a'; ctx.fillRect(RM, y + 6, 8, 40);
+  ctx.font = '700 38px ' + FONT_SANS; ctx.fillStyle = '#17504d'; ctx.textBaseline = 'top'; ctx.textAlign = 'left';
+  ctx.fillText(text, RM + 24, y + 4);
+  return y + 76;
+}
+const LEVEL_COL = { 0: '#1f6f6b', 1: '#c79a2e', 2: '#c79a2e', null: '#9aa8a6' };
+
+function renderReport(ctx, d) {
+  ctx.fillStyle = '#f4f7f6'; ctx.fillRect(0, 0, RW, 30000);
+  // ① ヘッダー
+  const g = ctx.createLinearGradient(0, 0, RW, 360); g.addColorStop(0, '#17504d'); g.addColorStop(1, '#2a8580');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, RW, 372);
+  star(ctx, RM + 22, 76, 22, '#e3c06a');
+  ctx.font = '600 34px ' + FONT_SANS; ctx.fillStyle = '#ffffff'; ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+  ctx.fillText(STORE_NAME, RM + 60, 76);
+  ctx.font = '700 92px ' + FONT_SERIF; ctx.textBaseline = 'alphabetic'; ctx.fillText('姿勢分析レポート', RM, 218);
+  let cx = RM; ctx.textBaseline = 'top';
+  cx += chip(ctx, '分析日 ' + d.dateText, cx, 262, 'rgba(255,255,255,.18)', '#ffffff') + 14;
+  chip(ctx, '写真から見た姿勢の特徴', cx, 262, '#e3c06a', '#3d2f08');
+  if (d.name) { ctx.font = '600 30px ' + FONT_SANS; ctx.fillStyle = '#ffffff'; ctx.textBaseline = 'top'; ctx.fillText(d.name + ' 様', RM, 322); }
+  let y = 372 + 48;
+
+  // ② 写真
+  y = sectionTitle(ctx, '撮影した写真と基準線', y);
+  const main = d.views.filter((v) => v.before);
+  const gap = 24, colW = (RW - RM * 2 - gap) / 2;
+  if (main.length === 2) {
+    const boxH = 640;
+    main.forEach((v, i) => photoBox(ctx, v.before, RM + i * (colW + gap), y, colW, boxH));
+    main.forEach((v, i) => { ctx.font = '700 28px ' + FONT_SANS; ctx.fillStyle = '#17504d'; ctx.textBaseline = 'top'; ctx.textAlign = 'left'; ctx.fillText(v.title, RM + i * (colW + gap) + 4, y + boxH + 14); });
+    y += boxH + 58;
+    let yy = y;
+    main.forEach((v, i) => { const e = listBlock(ctx, v.before.analysis.items, RM + i * (colW + gap), y, colW); yy = Math.max(yy, e); });
+    y = yy + 8;
+  } else if (main.length === 1) {
+    const v = main[0]; const bw = 500, bh = 667;
+    photoBox(ctx, v.before, RM, y, bw, bh);
+    ctx.font = '700 28px ' + FONT_SANS; ctx.fillStyle = '#17504d'; ctx.textBaseline = 'top'; ctx.fillText(v.title, RM + 4, y + bh + 14);
+    const e = listBlock(ctx, v.before.analysis.items, RM + bw + 36, y, RW - RM * 2 - bw - 36);
+    y = Math.max(y + bh + 58, e) + 8;
+  }
+  // 凡例
+  const legend = '白い丸：検出した身体の目印　／　金色の点線：基準線（水平・垂直）' + (main.some((v) => v.key === 'back') ? '\n後ろ姿の写真では、写真の左側がお客様の右側です。' : '');
+  y = para(ctx, legend, RM, y + 8, RW - RM * 2, '400 22px ' + FONT_SANS, '#5b6b69', 34) + 36;
+
+  // ③ まとめ
+  y = sectionTitle(ctx, '分析結果のまとめ', y);
+  main.forEach((v) => {
+    const pad = 32, inner = RW - RM * 2 - pad * 2;
+    const items = v.before.analysis.items;
+    // 高さを先に測る
+    let h = pad + 46;
+    items.forEach((it) => { ctx.font = '400 29px ' + FONT_SANS; h += 12 + 40 + wrap(ctx, it.text, inner - 34).length * 46 + 14; });
+    h += pad - 14;
+    ctx.fillStyle = '#ffffff'; rr(ctx, RM, y, RW - RM * 2, h, 24); ctx.fill();
+    ctx.strokeStyle = '#d8e2e0'; ctx.lineWidth = 2; rr(ctx, RM, y, RW - RM * 2, h, 24); ctx.stroke();
+    let yy = y + pad;
+    ctx.font = '700 32px ' + FONT_SANS; ctx.fillStyle = '#17504d'; ctx.textBaseline = 'top'; ctx.textAlign = 'left';
+    ctx.fillText(v.title + 'の写真から', RM + pad, yy); yy += 46;
+    items.forEach((it) => {
+      yy += 12;
+      ctx.fillStyle = LEVEL_COL[it.level]; ctx.beginPath(); ctx.arc(RM + pad + 9, yy + 20, 9, 0, Math.PI * 2); ctx.fill();
+      ctx.font = '700 28px ' + FONT_SANS; ctx.fillStyle = '#1d2b2a'; ctx.textBaseline = 'top'; ctx.fillText(it.label, RM + pad + 34, yy + 4); yy += 40;
+      yy = para(ctx, it.text, RM + pad + 34, yy, inner - 34, '400 29px ' + FONT_SANS, it.level === null ? '#7a8886' : '#1d2b2a', 46) + 14;
+    });
+    y += h + 24;
+  });
+  y += 12;
+
+  // ④ 説明
+  y = sectionTitle(ctx, 'お客様へのご説明', y);
+  {
+    const pad = 36, inner = RW - RM * 2 - pad * 2;
+    ctx.font = '400 31px ' + FONT_SANS;
+    const lines = wrap(ctx, d.explanation, inner).length;
+    const h = pad * 2 + lines * 52;
+    ctx.fillStyle = '#e8f2f0'; rr(ctx, RM, y, RW - RM * 2, h, 24); ctx.fill();
+    para(ctx, d.explanation, RM + pad, y + pad, inner, '400 31px ' + FONT_SANS, '#1d2b2a', 52);
+    y += h + 48;
+  }
+
+  // ⑤ 比較
+  const cmps = d.cmps || [];
+  if (cmps.length) {
+    y = sectionTitle(ctx, '施術前後の比較', y);
+    cmps.forEach((c) => {
+      const v = d.views.find((x) => x.key === c.view);
+      ctx.font = '700 32px ' + FONT_SANS; ctx.fillStyle = '#17504d'; ctx.textBaseline = 'top'; ctx.textAlign = 'left'; ctx.fillText(v.title, RM, y); y += 52;
+      const boxH = 600;
+      photoBox(ctx, v.before, RM, y, colW, boxH); photoBox(ctx, v.after, RM + colW + gap, y, colW, boxH);
+      chip(ctx, '施術前', RM + 16, y + 16, 'rgba(255,255,255,.92)', '#17504d');
+      chip(ctx, '施術後', RM + colW + gap + 16, y + 16, '#e3c06a', '#3d2f08');
+      y += boxH + 28;
+      const pad = 28, inner = RW - RM * 2 - pad * 2;
+      let h = pad;
+      ctx.font = '400 27px ' + FONT_SANS;
+      c.rows.forEach((r) => { h += 40 + 38 + wrap(ctx, r.change, inner).length * 42 + 18; });
+      h += pad - 18;
+      ctx.fillStyle = '#ffffff'; rr(ctx, RM, y, RW - RM * 2, h, 24); ctx.fill(); ctx.strokeStyle = '#d8e2e0'; ctx.lineWidth = 2; rr(ctx, RM, y, RW - RM * 2, h, 24); ctx.stroke();
+      let yy = y + pad;
+      c.rows.forEach((r) => {
+        ctx.font = '700 28px ' + FONT_SANS; ctx.fillStyle = '#1d2b2a'; ctx.textBaseline = 'top'; ctx.textAlign = 'left'; ctx.fillText(r.label, RM + pad, yy); yy += 40;
+        ctx.font = '400 25px ' + FONT_SANS; ctx.fillStyle = '#5b6b69'; ctx.fillText('施術前 ' + r.before + '　→　施術後 ' + r.after, RM + pad, yy); yy += 38;
+        yy = para(ctx, r.change, RM + pad, yy, inner, '400 27px ' + FONT_SANS, '#1d2b2a', 42) + 18;
+      });
+      y += h + 20;
+      if (c.extra) y = para(ctx, c.extra, RM, y + 4, RW - RM * 2, '400 24px ' + FONT_SANS, '#8a5a12', 38) + 16;
+      y += 28;
+    });
+    y = para(ctx, d.cmpNote, RM, y, RW - RM * 2, '400 24px ' + FONT_SANS, '#5b6b69', 38) + 40;
+  }
+
+  // ⑥ 注意書き
+  ctx.fillStyle = '#d8e2e0'; ctx.fillRect(RM, y, RW - RM * 2, 2); y += 26;
+  y = para(ctx, DISCLAIMER, RM, y, RW - RM * 2, '400 22px ' + FONT_SANS, '#5b6b69', 34) + 22;
+  star(ctx, RM + 10, y + 16, 10, '#b8923a');
+  ctx.font = '600 22px ' + FONT_SANS; ctx.fillStyle = '#17504d'; ctx.textBaseline = 'top'; ctx.textAlign = 'left'; ctx.fillText(STORE_NAME, RM + 30, y + 4);
+  return y + 60;
+}
+function listBlock(ctx, items, x, y, w) {
+  let yy = y;
+  items.forEach((it) => {
+    ctx.font = '700 25px ' + FONT_SANS; ctx.fillStyle = '#1d2b2a'; ctx.textBaseline = 'top'; ctx.textAlign = 'left';
+    const lab = wrap(ctx, it.label, w);
+    lab.forEach((l, i) => ctx.fillText(l, x, yy + i * 34)); yy += lab.length * 34;
+    yy = para(ctx, it.detail || '判定できませんでした', x, yy, w, '400 22px ' + FONT_SANS, '#5b6b69', 32) + 14;
+  });
+  return yy;
+}
+
+function reportData() {
+  const views = VIEWS.map((v) => ({ key: v.key, title: v.title, before: state.photos[v.key + '-before'] && state.photos[v.key + '-before'].analysis ? state.photos[v.key + '-before'] : null, after: state.photos[v.key + '-after'] && state.photos[v.key + '-after'].analysis ? state.photos[v.key + '-after'] : null }));
+  const dv = $('dateInput').value.split('-');
+  const dateText = dv.length === 3 ? dv[0] + '年' + parseInt(dv[1], 10) + '月' + parseInt(dv[2], 10) + '日' : '';
+  const cmps = (state.cmps || []).filter((c) => { const v = views.find((x) => x.key === c.view); return v && v.before && v.after; });
+  return { views, dateText, name: $('nameChk').checked ? $('nameInput').value.trim() : '', explanation: state.explanation, cmps, cmpNote: state.cmpNote };
+}
+function makeStatus(msg, kind) { const e = $('makeStatus'); e.hidden = !msg; e.textContent = msg || ''; e.className = 'status' + (kind ? ' ' + kind : ''); }
+function clearReportPreview() {
+  if (state.reportUrl) { URL.revokeObjectURL(state.reportUrl); state.reportUrl = null; }
+  state.reportBlob = null;
+  if (state.reportCanvas) { state.reportCanvas.width = 0; state.reportCanvas.height = 0; state.reportCanvas = null; }
+  const img = $('previewImg'); img.removeAttribute('src');
+  $('previewBox').hidden = true; makeStatus('', ''); const s = $('shareStatus'); s.hidden = true;
+}
+async function makeReport() {
+  const d = reportData();
+  if (!d.views.some((v) => v.before)) { makeStatus('先に姿勢分析を実行してください。', 'err'); return; }
+  clearReportPreview();
+  makeStatus('レポート画像を作成しています…', 'busy');
+  await new Promise((r) => setTimeout(r, 30));
+  try {
+    const scratch = document.createElement('canvas'); scratch.width = RW; scratch.height = 50;
+    const H = Math.ceil(renderReport(scratch.getContext('2d'), d));
+    scratch.width = 0;
+    const cv = document.createElement('canvas'); cv.width = RW; cv.height = H;
+    renderReport(cv.getContext('2d'), d);
+    const blob = await new Promise((res) => cv.toBlob(res, 'image/png'));
+    if (!blob) throw new Error('toBlob failed');
+    state.reportCanvas = cv; state.reportBlob = blob; state.reportUrl = URL.createObjectURL(blob);
+    $('previewImg').src = state.reportUrl;
+    $('previewBox').hidden = false;
+    makeStatus('レポート画像ができました（' + RW + '×' + H + 'px / PNG）。内容を確認してから保存・共有してください。', 'ok');
+    $('previewBox').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } catch (e) {
+    makeStatus('レポート画像を作成できませんでした。写真の枚数を減らして、もう一度お試しください。', 'err');
+  }
+}
+
+/* =========================================================
+   保存・共有（スタッフがボタンを押したときだけ実行）
+   ========================================================= */
+function shareStatus(msg, kind) { const e = $('shareStatus'); e.hidden = !msg; e.textContent = msg || ''; e.className = 'status' + (kind ? ' ' + kind : ''); }
+function reportFile() {
+  const d = new Date(); const p = (n) => String(n).padStart(2, '0');
+  return new File([state.reportBlob], 'star-posture-report-' + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + '.png', { type: 'image/png' });
+}
+async function shareReport() {
+  if (!state.reportBlob) return;
+  const f = reportFile();
+  try {
+    if (navigator.canShare && navigator.canShare({ files: [f] }) && navigator.share) {
+      await navigator.share({ files: [f], title: '姿勢分析レポート' });
+      shareStatus('共有画面を閉じました。送信できたかどうかは、LINEなど送り先のアプリでご確認ください。', '');
+    } else {
+      shareStatus('この環境では共有機能が使えません。「画像を保存」を押すか、上の画像を長押しして保存してから、LINEなどで送ってください。', 'busy');
+    }
+  } catch (e) {
+    if (e && e.name === 'AbortError') shareStatus('共有をキャンセルしました。', '');
+    else shareStatus('共有を開始できませんでした。上の画像を長押しして保存してから、LINEなどで送ってください。', 'err');
+  }
+}
+function saveReport() {
+  if (!state.reportBlob) return;
+  try {
+    const a = document.createElement('a'); a.href = state.reportUrl; a.download = reportFile().name;
+    document.body.appendChild(a); a.click(); a.remove();
+    shareStatus('保存を開始しました。iPhoneでは「ファイル」アプリのダウンロードに入ります。写真アプリに入れたい場合は、上の画像を長押しして「写真に追加」を選んでください。', '');
+  } catch (e) {
+    shareStatus('保存を開始できませんでした。上の画像を長押しして「写真に追加」を選んでください。', 'err');
+  }
+}
+
+/* =========================================================
+   リセット（元画像・分析データ・レポートを消去）
+   ========================================================= */
+let resetArmed = false, resetTimer = null;
+function doReset() {
+  clearReportPreview();
+  Object.keys(state.photos).forEach((k) => { const p = state.photos[k]; if (p && p.canvas) { p.canvas.width = 0; p.canvas.height = 0; } p.lms = null; p.analysis = null; });
+  state.photos = {}; state.analyzed = false; state.explanation = ''; state.cmpNote = ''; state.cmps = [];
+  Object.keys(slotEls).forEach((k) => paintSlot(k));
+  document.querySelectorAll('details.after-wrap').forEach((d) => { d.open = false; });
+  $('results').textContent = ''; $('editArea').textContent = '';
+  ['step3', 'step4', 'step5'].forEach((id) => { $(id).hidden = true; });
+  $('nameChk').checked = false; $('nameInput').value = ''; $('nameWrap').hidden = true; $('dateInput').value = '';
+  $('runBtn').disabled = true; setRun('消去しました。次のお客様の写真を選んでください。', 'ok');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+function onResetClick() {
+  const b = $('resetBtn');
+  if (!resetArmed) {
+    resetArmed = true; b.classList.add('armed'); b.textContent = 'もう一度押すと、すべて消去します';
+    resetTimer = setTimeout(disarm, 5000); return;
+  }
+  disarm(); doReset();
+}
+function disarm() { resetArmed = false; clearTimeout(resetTimer); const b = $('resetBtn'); b.classList.remove('armed'); b.textContent = '消去して次のお客様へ'; }
+
+/* =========================================================
+   起動
+   ========================================================= */
+buildSlots();
+$('runBtn').addEventListener('click', runAnalysis);
+$('makeBtn').addEventListener('click', makeReport);
+$('shareBtn').addEventListener('click', shareReport);
+$('saveBtn').addEventListener('click', saveReport);
+$('resetBtn').addEventListener('click', onResetClick);
+$('nameChk').addEventListener('change', () => { $('nameWrap').hidden = !$('nameChk').checked; clearReportPreview(); });
+$('nameInput').addEventListener('input', clearReportPreview);
+$('dateInput').addEventListener('change', clearReportPreview);
+window.addEventListener('pagehide', () => { try { clearReportPreview(); } catch (e) { /* noop */ } });
+</script>
+</body>
+</html>
