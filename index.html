@@ -93,7 +93,7 @@ textarea:focus,input:focus{outline:3px solid var(--gold);outline-offset:1px}
 .chk{display:flex;gap:10px;align-items:center;font-size:14px;min-height:40px}
 .chk input{width:22px;height:22px;accent-color:var(--teal)}
 .preview{display:flex;flex-direction:column;gap:12px;align-items:center}
-.preview img{width:100%;max-width:420px;height:auto;border:1px solid var(--line);border-radius:10px;-webkit-touch-callout:default;user-select:auto;-webkit-user-select:auto}
+.preview img{width:100%;max-width:100%;height:auto;border:1px solid var(--line);border-radius:10px;-webkit-touch-callout:default;user-select:auto;-webkit-user-select:auto}
 .note{background:var(--gold-soft);border-radius:12px;padding:12px 14px;font-size:13px;line-height:1.7;color:#5b4410}
 .note ul{margin:6px 0 0;padding-left:1.2em}
 .engine-line{display:flex;gap:8px;align-items:center;font-size:12px;color:var(--muted)}
@@ -167,7 +167,7 @@ textarea:focus,input:focus{outline:3px solid var(--gold);outline-offset:1px}
     <button class="btn primary" id="makeBtn" type="button">レポート画像を作成</button>
     <div class="status" id="makeStatus" role="status" aria-live="polite" hidden></div>
     <div class="preview" id="previewBox" hidden>
-      <img id="previewImg" alt="作成したレポート画像のプレビュー">
+      <div id="previewImgs" style="display:flex;flex-direction:column;gap:12px;width:100%"></div>
       <div class="btns" style="width:100%;max-width:420px">
         <button class="btn primary" id="saveBtn" type="button">画像を保存</button>
         <button class="btn primary" id="shareBtn" type="button">共有する</button>
@@ -225,8 +225,9 @@ const state = {
   analyzed: false,
   explanation: '',
   cmpNote: '',
-  reportUrl: null,
-  reportCanvas: null,
+  reportUrls: [],
+  reportBlobs: [],
+  reportCanvases: [],
   busy: false
 };
 const $ = (id) => document.getElementById(id);
@@ -811,23 +812,24 @@ function sectionHead(ctx, en, ja, y) {
   ctx.fillStyle = g; ctx.fillRect(RM + w + 28, y + 58, RW - RM * 2 - w - 28, 3);
   return y + 110;
 }
-function gauge(ctx, x, y, w, sc, marks) {
-  const h = 14, pad = 16, tx = x + pad, tw = w - pad * 2, ty = y + 18;
+function gauge(ctx, x, y, w, sc, marks, z) {
+  z = z || 1;
+  const h = 14 * z, pad = 16 * z, tx = x + pad, tw = w - pad * 2, ty = y + 18 * z;
   ctx.save();
-  ctx.fillStyle = '#e1e9e7'; rr(ctx, x, ty, w, h, 7); ctx.fill();
-  const zw = tw * 0.16; ctx.fillStyle = '#bfdcd7'; rr(ctx, x + w / 2 - zw / 2, ty, zw, h, 7); ctx.fill();
-  ctx.fillStyle = '#7ea39e'; ctx.fillRect(x + w / 2 - 1.5, ty - 7, 3, h + 14);
+  ctx.fillStyle = '#e1e9e7'; rr(ctx, x, ty, w, h, h / 2); ctx.fill();
+  const zw = tw * 0.16; ctx.fillStyle = '#bfdcd7'; rr(ctx, x + w / 2 - zw / 2, ty, zw, h, h / 2); ctx.fill();
+  ctx.fillStyle = '#7ea39e'; ctx.fillRect(x + w / 2 - 1.5, ty - 7 * z, 3, h + 14 * z);
   marks.forEach((m) => {
     const p = Math.max(-1, Math.min(1, m.val / sc.r)); const cx = tx + tw * (0.5 + p * 0.5), cy = ty + h / 2;
-    ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.28)'; ctx.shadowBlur = 8; ctx.shadowOffsetY = 2; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(cx, cy, 18, 0, Math.PI * 2); ctx.fill(); ctx.restore();
-    ctx.fillStyle = m.fill; ctx.beginPath(); ctx.arc(cx, cy, 11.5, 0, Math.PI * 2); ctx.fill();
+    ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.28)'; ctx.shadowBlur = 8; ctx.shadowOffsetY = 2; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(cx, cy, 18 * z, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    ctx.fillStyle = m.fill; ctx.beginPath(); ctx.arc(cx, cy, 11.5 * z, 0, Math.PI * 2); ctx.fill();
   });
-  ctx.font = '500 21px ' + FONT_SANS; ctx.fillStyle = C_MUTED; ctx.textBaseline = 'top';
-  ctx.textAlign = 'left'; ctx.fillText(sc.e[0], x, ty + h + 18);
-  ctx.textAlign = 'right'; ctx.fillText(sc.e[1], x + w, ty + h + 18);
-  ctx.textAlign = 'center'; ctx.fillText('そろっている', x + w / 2, ty + h + 18);
+  ctx.font = '500 ' + (21 * z) + 'px ' + FONT_SANS; ctx.fillStyle = C_MUTED; ctx.textBaseline = 'top';
+  ctx.textAlign = 'left'; ctx.fillText(sc.e[0], x, ty + h + 18 * z);
+  ctx.textAlign = 'right'; ctx.fillText(sc.e[1], x + w, ty + h + 18 * z);
+  ctx.textAlign = 'center'; ctx.fillText('そろっている', x + w / 2, ty + h + 18 * z);
   ctx.restore();
-  return ty + h + 18 + 30;
+  return ty + h + 18 * z + 30 * z;
 }
 function drawItem(ctx, it, x, y, w) {
   const known = it.mag != null;
@@ -862,115 +864,190 @@ function itemsCard(ctx, view, items, y, withNote) {
   return y + h + 28;
 }
 
-function renderReport(ctx, d) {
-  ctx.fillStyle = '#f6f5f1'; ctx.fillRect(0, 0, RW, 30000);
-  // ① ヘッダー
-  const HH = d.name ? 438 : 400;
-  const g = ctx.createLinearGradient(0, 0, RW, HH); g.addColorStop(0, '#0c3533'); g.addColorStop(0.6, '#17504d'); g.addColorStop(1, '#2a8580');
-  ctx.fillStyle = g; ctx.fillRect(0, 0, RW, HH);
-  ctx.save(); ctx.beginPath(); ctx.rect(0, 0, RW, HH); ctx.clip(); star(ctx, RW - 150, 200, 300, 'rgba(227,192,106,.11)'); star(ctx, RW - 150, 200, 190, 'rgba(255,255,255,.05)'); ctx.restore();
-  ctx.fillStyle = C_GOLD_L; ctx.fillRect(0, HH - 5, RW, 5);
-  star(ctx, RM + 18, 78, 18, C_GOLD_L);
-  ctx.font = '600 31px ' + FONT_SANS; ctx.fillStyle = '#ffffff'; ctx.textBaseline = 'middle'; ctx.textAlign = 'left'; ctx.fillText(STORE_NAME, RM + 52, 78);
-  ctx.font = '600 21px ' + FONT_SANS; ctx.fillStyle = C_GOLD_L; ctx.textBaseline = 'top'; spaced(ctx, 'POSTURE  ANALYSIS  REPORT', RM, 140, 6);
-  ctx.font = '700 94px ' + FONT_SERIF; ctx.fillStyle = '#ffffff'; ctx.textBaseline = 'alphabetic'; ctx.fillText('姿勢分析レポート', RM, 262);
-  ctx.textBaseline = 'top';
-  let cx = RM; cx += chip(ctx, '分析日 ' + d.dateText, cx, 296, 'rgba(255,255,255,.16)', '#ffffff') + 14;
-  chip(ctx, '写真から見た姿勢の特徴', cx, 296, C_GOLD_L, '#3d2f08');
-  if (d.name) { ctx.font = '600 32px ' + FONT_SANS; ctx.fillStyle = '#ffffff'; ctx.textBaseline = 'top'; ctx.textAlign = 'left'; ctx.fillText(d.name + ' 様', RM, 360); }
-  let y = HH + 60;
+/* =========================================================
+   横長レポート（ページ1：全体 / ページ2：施術前後の比較）
+   ========================================================= */
+const LW = 2000, LM = 56;
+const SHORT = { head: '頭の前後', lean: '上半身の傾き', axis: '前後バランス', shoulder: '肩の高さ', pelvis: '腰の高さ', ears: '耳の高さ', cHead: '頭の左右', cHip: '腰の左右' };
+const STATUS = { 0: 'ほぼそろっている', 1: '少し差が見える', 2: '差が見える' };
+const balanceVal = (it) => 1 - Math.min(1, it.mag / SCALE[it.key].r);
 
-  // ② 写真
-  y = sectionHead(ctx, 'PHOTOS', '撮影した写真と基準線', y);
+function chipL(ctx, text, x, y, bg, fg, fs) {
+  fs = fs || 30; ctx.font = '600 ' + fs + 'px ' + FONT_SANS; const w = ctx.measureText(text).width + fs * 1.4, h = fs * 1.7;
+  ctx.fillStyle = bg; rr(ctx, x, y, w, h, h / 2); ctx.fill();
+  ctx.fillStyle = fg; ctx.textBaseline = 'middle'; ctx.textAlign = 'left'; ctx.fillText(text, x + fs * 0.7, y + h / 2 + 1);
+  return w;
+}
+function chipWidth(ctx, text, fs) { fs = fs || 30; ctx.font = '600 ' + fs + 'px ' + FONT_SANS; return ctx.measureText(text).width + fs * 1.4; }
+function photoFrameL(ctx, p, x, y, w, h, label, bg, fg) {
+  softCard(ctx, x, y, w, h, 30, '#ffffff');
+  photoBox(ctx, p, x + 14, y + 14, w - 28, h - 28);
+  if (label) { ctx.save(); ctx.shadowColor = 'rgba(15,63,61,.25)'; ctx.shadowBlur = 10; ctx.shadowOffsetY = 3; chipL(ctx, label, x + 34, y - 26, bg || '#ffffff', fg || C_DEEP, 30); ctx.restore(); }
+}
+function lHeader(ctx, d, title) {
+  const HH = 180;
+  const g = ctx.createLinearGradient(0, 0, LW, HH); g.addColorStop(0, '#0c3533'); g.addColorStop(0.6, '#17504d'); g.addColorStop(1, '#2a8580');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, LW, HH);
+  ctx.save(); ctx.beginPath(); ctx.rect(0, 0, LW, HH); ctx.clip(); star(ctx, LW - 420, 110, 280, 'rgba(227,192,106,.10)'); star(ctx, LW - 420, 110, 180, 'rgba(255,255,255,.04)'); ctx.restore();
+  ctx.fillStyle = C_GOLD_L; ctx.fillRect(0, HH - 6, LW, 6);
+  star(ctx, LM + 18, 54, 18, C_GOLD_L);
+  ctx.font = '600 32px ' + FONT_SANS; ctx.fillStyle = '#ffffff'; ctx.textBaseline = 'middle'; ctx.textAlign = 'left'; ctx.fillText(STORE_NAME, LM + 52, 54);
+  ctx.font = '700 78px ' + FONT_SERIF; ctx.fillStyle = '#ffffff'; ctx.textBaseline = 'alphabetic'; ctx.fillText(title, LM, 150);
+  // 右側：分析日・お名前
+  const t2 = '分析日 ' + d.dateText, t1 = '写真から見た姿勢の特徴';
+  const w2 = chipWidth(ctx, t2), w1 = chipWidth(ctx, t1);
+  let rx = LW - LM - w2; chipL(ctx, t2, rx, 40, 'rgba(255,255,255,.16)', '#ffffff'); rx -= w1 + 16; chipL(ctx, t1, rx, 40, C_GOLD_L, '#3d2f08');
+  if (d.name) { ctx.font = '600 38px ' + FONT_SANS; ctx.fillStyle = '#ffffff'; ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'right'; ctx.fillText(d.name + ' 様', LW - LM, 140); ctx.textAlign = 'left'; }
+  return HH;
+}
+function lFooter(ctx, y) {
+  const m = MC(); const dEnd = para(m, DISCLAIMER, 0, 0, LW - LM * 2, '400 26px ' + FONT_SANS, '#fff', 40);
+  const FH = 36 + 44 + 14 + dEnd + 36;
+  ctx.fillStyle = C_DEEP; ctx.fillRect(0, y, LW, FH); ctx.fillStyle = C_GOLD_L; ctx.fillRect(0, y, LW, 5);
+  star(ctx, LM + 16, y + 36 + 22, 16, C_GOLD_L);
+  ctx.font = '600 30px ' + FONT_SERIF; ctx.fillStyle = '#ffffff'; ctx.textBaseline = 'middle'; ctx.textAlign = 'left'; ctx.fillText(STORE_NAME, LM + 46, y + 36 + 22);
+  para(ctx, DISCLAIMER, LM, y + 36 + 44 + 14, LW - LM * 2, '400 26px ' + FONT_SANS, 'rgba(255,255,255,.74)', 40);
+  return y + FH;
+}
+function scoreCard(ctx, x, y, w, known) {
+  const h = 330; softCard(ctx, x, y, w, h, 30, '#ffffff');
+  ctx.textBaseline = 'top'; ctx.textAlign = 'left';
+  if (known.length < 3) {
+    ctx.font = '700 36px ' + FONT_SERIF; ctx.fillStyle = C_DEEP; ctx.fillText('バランススコア', x + 36, y + 32);
+    para(ctx, '判定できた項目が少ないため、スコアは表示していません。', x + 36, y + 96, w - 72, '400 30px ' + FONT_SANS, C_MUTED, 46);
+    return y + h;
+  }
+  const score = Math.round(known.reduce((a, it) => a + balanceVal(it), 0) / known.length * 100);
+  const cx = x + 36 + 118, cy = y + h / 2 + 4, R = 100;
+  ctx.save(); ctx.lineWidth = 26; ctx.lineCap = 'round'; ctx.strokeStyle = '#e1e9e7'; ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke();
+  ctx.strokeStyle = C_TEAL; ctx.beginPath(); ctx.arc(cx, cy, R, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * score / 100); ctx.stroke(); ctx.restore();
+  ctx.font = '700 96px ' + FONT_SERIF; ctx.fillStyle = C_TEAL; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(String(score), cx, cy - 6);
+  ctx.font = '500 26px ' + FONT_SANS; ctx.fillStyle = C_MUTED; ctx.fillText('/ 100', cx, cy + 62);
+  ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+  const tx = x + 36 + 236 + 30, tw = w - (tx - x) - 32;
+  ctx.font = '700 38px ' + FONT_SERIF; ctx.fillStyle = C_DEEP; ctx.fillText('バランススコア', tx, y + 46);
+  para(ctx, '写真上の左右差・傾きが小さいほど高くなる、お店の参考値です。診断の点数ではありません。', tx, y + 104, tw, '400 26px ' + FONT_SANS, C_MUTED, 40);
+  ctx.font = '500 24px ' + FONT_SANS; ctx.fillStyle = '#8a9a97'; ctx.fillText('計算に使った項目：' + known.length + '項目', tx, y + h - 60);
+  return y + h;
+}
+function radarCard(ctx, x, y, w, known) {
+  const h = 540; softCard(ctx, x, y, w, h, 30, '#ffffff');
+  ctx.textBaseline = 'top'; ctx.textAlign = 'left';
+  ctx.font = '700 36px ' + FONT_SERIF; ctx.fillStyle = C_DEEP; ctx.fillText('バランスレーダー', x + 36, y + 32);
+  ctx.font = '500 25px ' + FONT_SANS; ctx.fillStyle = C_MUTED; ctx.fillText('外側ほど、そろって見えます', x + 36, y + 82);
+  if (known.length < 3) { para(ctx, '判定できた項目が少ないため、表示していません。', x + 36, y + 150, w - 72, '400 28px ' + FONT_SANS, C_MUTED, 44); return y + h; }
+  const cx = x + w / 2, cy = y + 322, R = 132, n = known.length;
+  const ang = (i) => -Math.PI / 2 + i * Math.PI * 2 / n;
+  const P = (i, r) => ({ x: cx + r * Math.cos(ang(i)), y: cy + r * Math.sin(ang(i)) });
+  ctx.save();
+  for (let k = 4; k >= 1; k--) { ctx.beginPath(); for (let i = 0; i < n; i++) { const p = P(i, R * k / 4); i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y); } ctx.closePath(); ctx.fillStyle = k % 2 ? '#f1f6f5' : '#e6efed'; ctx.fill(); ctx.strokeStyle = '#cbdad7'; ctx.lineWidth = 2; ctx.stroke(); }
+  for (let i = 0; i < n; i++) { const p = P(i, R); ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(p.x, p.y); ctx.strokeStyle = '#cbdad7'; ctx.lineWidth = 2; ctx.stroke(); }
+  ctx.beginPath(); known.forEach((it, i) => { const p = P(i, R * Math.max(0.04, balanceVal(it))); i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y); }); ctx.closePath();
+  ctx.fillStyle = 'rgba(31,111,107,.28)'; ctx.fill(); ctx.strokeStyle = C_TEAL; ctx.lineWidth = 5; ctx.lineJoin = 'round'; ctx.stroke();
+  known.forEach((it, i) => { const p = P(i, R * Math.max(0.04, balanceVal(it))); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(p.x, p.y, 11, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = C_TEAL; ctx.beginPath(); ctx.arc(p.x, p.y, 7, 0, Math.PI * 2); ctx.fill(); });
+  ctx.font = '600 27px ' + FONT_SANS; ctx.fillStyle = C_INK; ctx.textBaseline = 'middle';
+  known.forEach((it, i) => { const p = P(i, R + 26), c = Math.cos(ang(i)); ctx.textAlign = c > 0.3 ? 'left' : c < -0.3 ? 'right' : 'center'; const dy = Math.sin(ang(i)) < -0.5 ? -8 : Math.sin(ang(i)) > 0.5 ? 10 : 0; ctx.fillText(SHORT[it.key] || it.label, p.x, p.y + dy); });
+  ctx.restore();
+  return y + h;
+}
+function rowsCard(ctx, items, x, y, w, rh) {
+  const h = 24 + items.length * rh + 12; softCard(ctx, x, y, w, h, 30, '#ffffff');
+  let yy = y + 24; const pad = 32;
+  items.forEach((it, i) => {
+    ctx.fillStyle = LEVEL_COL[it.level]; ctx.beginPath(); ctx.arc(x + pad + 10, yy + rh / 2 - 3, 10, 0, Math.PI * 2); ctx.fill();
+    ctx.textBaseline = 'top'; ctx.textAlign = 'left';
+    ctx.font = '700 31px ' + FONT_SANS; ctx.fillStyle = C_INK; ctx.fillText(it.label, x + pad + 32, yy + rh / 2 - 38, w - pad * 2 - 32 - (it.mag != null ? 170 : 0));
+    ctx.font = '400 26px ' + FONT_SANS; ctx.fillStyle = it.level === null ? '#7a8886' : C_MUTED; ctx.fillText(it.level === null ? '判定できませんでした' : STATUS[it.level], x + pad + 32, yy + rh / 2 + 4);
+    if (it.mag != null) { ctx.font = '700 52px ' + FONT_SERIF; ctx.fillStyle = C_TEAL; ctx.textAlign = 'right'; ctx.textBaseline = 'middle'; ctx.fillText(valText(it), x + w - pad, yy + rh / 2 - 4); ctx.textAlign = 'left'; }
+    if (i < items.length - 1) { ctx.fillStyle = '#e6ecea'; ctx.fillRect(x + pad, yy + rh - 1, w - pad * 2, 2); }
+    yy += rh;
+  });
+  return y + h;
+}
+
+function renderPage1(ctx, d) {
+  ctx.fillStyle = '#f6f5f1'; ctx.fillRect(0, 0, LW, 30000);
+  const HH = lHeader(ctx, d, '姿勢分析レポート');
+  const top = HH + 40;
   const main = d.views.filter((v) => v.before);
-  const gap = 28, colW = (RW - RM * 2 - gap) / 2;
+  const items = []; main.forEach((v) => v.before.analysis.items.forEach((i) => items.push(i)));
+  const known = items.filter((i) => i.mag != null && SCALE[i.key]);
+  // 左：スコア・レーダー
+  const lw = 680; let ly = top;
+  ly = scoreCard(ctx, LM, ly, lw, known) + 24;
+  ly = radarCard(ctx, LM, ly, lw, known);
+  // 右：写真と数値
+  const rx = LM + lw + 32, rw = LW - LM - rx; let ry = top;
   if (main.length === 2) {
-    const boxH = 680;
-    main.forEach((v, i) => photoFrame(ctx, v.before, RM + i * (colW + gap), y, colW, boxH, v.title));
-    y += boxH + 40;
+    const cw = (rw - 28) / 2, ph = 600;
+    main.forEach((v, i) => photoFrameL(ctx, v.before, rx + i * (cw + 28), ry, cw, ph, v.title));
+    let e = 0; main.forEach((v, i) => { e = Math.max(e, rowsCard(ctx, v.before.analysis.items, rx + i * (cw + 28), ry + ph + 24, cw, 76)); });
+    ry = e;
   } else if (main.length === 1) {
-    const v = main[0]; const bw = 560, bh = 740;
-    photoFrame(ctx, v.before, RM, y, bw, bh, v.title);
-    const kx = RM + bw + 44, kw = RW - RM - kx; let ky = y + 24;
-    v.before.analysis.items.forEach((it) => {
-      ctx.textBaseline = 'top'; ctx.textAlign = 'left';
-      ctx.font = '600 23px ' + FONT_SANS; ctx.fillStyle = C_MUTED; ctx.fillText(it.label, kx, ky);
-      ctx.font = '700 54px ' + FONT_SERIF; ctx.fillStyle = it.mag == null ? '#9aa8a6' : C_TEAL;
-      ctx.fillText(it.mag == null ? '判定不可' : valText(it), kx, ky + 30, kw);
-      ctx.fillStyle = '#dfe7e5'; ctx.fillRect(kx, ky + 104, kw, 2);
-      ky += 132;
-    });
-    y += bh + 40;
+    const v = main[0], cw = (rw - 28) / 2, ph = 720;
+    photoFrameL(ctx, v.before, rx, ry, cw, ph, v.title);
+    ry = Math.max(ry + ph, rowsCard(ctx, v.before.analysis.items, rx + cw + 28, ry, cw, Math.min(150, Math.floor(ph / v.before.analysis.items.length))));
   }
-  const legend = '白い丸：検出した身体の目印　／　金色の点線：基準線（水平・垂直）' + (main.some((v) => v.key === 'back') ? '\n後ろ姿の写真では、写真の左側がお客様の右側です。' : '');
-  y = para(ctx, legend, RM, y, RW - RM * 2, '400 22px ' + FONT_SANS, C_MUTED, 34) + 56;
-
-  // ③ まとめ
-  y = sectionHead(ctx, 'RESULTS', '分析結果のまとめ', y);
-  main.forEach((v) => { y = itemsCard(ctx, v.title, v.before.analysis.items, y, v.key === 'back'); });
-  y += 28;
-
-  // ④ 説明
-  y = sectionHead(ctx, 'MESSAGE', 'お客様へのご説明', y);
+  let y = Math.max(ly, ry) + 18;
+  const legend = '白い丸：検出した身体の目印　／　金色の点線：基準線（水平・垂直）' + (main.some((v) => v.key === 'back') ? '　／　後ろ姿は、写真の左側がお客様の右側です' : '');
+  y = para(ctx, legend, LM, y, LW - LM * 2, '400 25px ' + FONT_SANS, C_MUTED, 38) + 26;
+  // 説明
   {
-    const pad = 40, inner = RW - RM * 2 - pad * 2;
-    ctx.font = '400 31px ' + FONT_SANS;
-    const lines = wrap(ctx, d.explanation, inner).length;
-    const h = pad * 2 + lines * 54;
-    const gg = ctx.createLinearGradient(RM, y, RW - RM, y + h); gg.addColorStop(0, '#e6f1ef'); gg.addColorStop(1, '#f3f1e6');
-    softCard(ctx, RM, y, RW - RM * 2, h, 28, gg);
-    star(ctx, RW - RM - 46, y + 46, 18, 'rgba(184,146,58,.55)');
-    para(ctx, d.explanation, RM + pad, y + pad, inner, '400 31px ' + FONT_SANS, C_INK, 54);
-    y += h + 64;
+    const pad = 40, inner = LW - LM * 2 - pad * 2;
+    const m = MC(); const tEnd = para(m, d.explanation, 0, 0, inner, '400 30px ' + FONT_SANS, '#000', 48);
+    const h = pad + 52 + tEnd + pad - 10;
+    const gg = ctx.createLinearGradient(LM, y, LW - LM, y + h); gg.addColorStop(0, '#e6f1ef'); gg.addColorStop(1, '#f3f1e6');
+    softCard(ctx, LM, y, LW - LM * 2, h, 30, gg);
+    star(ctx, LW - LM - 52, y + 52, 20, 'rgba(184,146,58,.55)');
+    ctx.font = '700 36px ' + FONT_SERIF; ctx.fillStyle = C_DEEP; ctx.textBaseline = 'top'; ctx.textAlign = 'left'; ctx.fillText('お客様へのご説明', LM + pad, y + pad - 4);
+    para(ctx, d.explanation, LM + pad, y + pad + 52, inner, '400 30px ' + FONT_SANS, C_INK, 48);
+    y += h + 40;
   }
+  return lFooter(ctx, y);
+}
 
-  // ⑤ 比較
-  const cmps = d.cmps || [];
-  if (cmps.length) {
-    y = sectionHead(ctx, 'BEFORE / AFTER', '施術前後の比較', y);
-    cmps.forEach((c) => {
-      const v = d.views.find((x) => x.key === c.view);
-      ctx.font = '700 34px ' + FONT_SERIF; ctx.fillStyle = C_DEEP; ctx.textBaseline = 'top'; ctx.textAlign = 'left'; ctx.fillText(v.title, RM, y); y += 56;
-      const boxH = 620;
-      photoFrame(ctx, v.before, RM, y, colW, boxH, '施術前', 'rgba(255,255,255,.94)', C_DEEP);
-      photoFrame(ctx, v.after, RM + colW + gap, y, colW, boxH, '施術後', C_GOLD_L, '#3d2f08');
-      y += boxH + 32;
-      const pad = 36, inner = RW - RM * 2 - pad * 2;
-      const rowDraw = (cx2, r, x, yy) => {
-        cx2.textBaseline = 'top'; cx2.textAlign = 'left';
-        cx2.font = '700 29px ' + FONT_SANS; cx2.fillStyle = C_INK; cx2.fillText(r.label, x, yy); yy += 42;
-        cx2.font = '400 24px ' + FONT_SANS; cx2.fillStyle = C_MUTED; cx2.fillText('施術前 ' + r.before + '　→　施術後 ' + r.after, x, yy); yy += 36;
-        const sc = SCALE[r.key];
-        if (sc && r.bv != null && r.av != null) yy = gauge(cx2, x, yy + 4, inner, sc, [{ val: r.bv, fill: C_TEAL }, { val: r.av, fill: C_GOLD }]) + 2;
-        return para(cx2, r.change, x, yy + 4, inner, '400 27px ' + FONT_SANS, C_INK, 42) + 10;
-      };
-      const measure = () => { const m = MC(); let yy = 74; c.rows.forEach((r, i) => { yy = rowDraw(m, r, 0, yy) + (i < c.rows.length - 1 ? 22 : 0); }); return yy + pad - 10; };
-      const h = measure();
-      softCard(ctx, RM, y, RW - RM * 2, h, 28, '#ffffff');
-      // 凡例
-      ctx.fillStyle = C_TEAL; ctx.beginPath(); ctx.arc(RM + pad + 10, y + pad + 16, 10, 0, Math.PI * 2); ctx.fill();
-      ctx.font = '500 24px ' + FONT_SANS; ctx.fillStyle = C_INK; ctx.textBaseline = 'top'; ctx.textAlign = 'left'; ctx.fillText('施術前', RM + pad + 28, y + pad + 3);
-      ctx.fillStyle = C_GOLD; ctx.beginPath(); ctx.arc(RM + pad + 168, y + pad + 16, 10, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = C_INK; ctx.fillText('施術後', RM + pad + 186, y + pad + 3);
-      let yy = y + 74;
-      c.rows.forEach((r, i) => { yy = rowDraw(ctx, r, RM + pad, yy); if (i < c.rows.length - 1) { ctx.fillStyle = '#e6ecea'; ctx.fillRect(RM + pad, yy + 8, inner, 2); yy += 22; } });
-      y += h + 24;
-      if (c.extra) y = para(ctx, c.extra, RM, y + 4, RW - RM * 2, '400 24px ' + FONT_SANS, '#8a5a12', 38) + 16;
-      y += 32;
+function cmpCell(ctx, r, x, y, w) {
+  ctx.textBaseline = 'top'; ctx.textAlign = 'left';
+  ctx.font = '700 29px ' + FONT_SANS; ctx.fillStyle = C_INK; ctx.fillText(r.label, x, y, w - 190);
+  const nums = (r.nb != null ? r.nb : r.before) + ' → ' + (r.na != null ? r.na : r.after);
+  ctx.font = '500 25px ' + FONT_SANS; ctx.fillStyle = C_MUTED; ctx.textAlign = 'right'; ctx.fillText(nums, x + w, y + 4, 200); ctx.textAlign = 'left';
+  y += 48;
+  const sc = SCALE[r.key];
+  if (sc && r.bv != null && r.av != null) y = gauge(ctx, x, y, w, sc, [{ val: r.bv, fill: C_TEAL }, { val: r.av, fill: C_GOLD }], 1.1) + 2;
+  return para(ctx, r.change, x, y + 6, w, '400 27px ' + FONT_SANS, C_INK, 41) + 8;
+}
+function renderPage2(ctx, d) {
+  ctx.fillStyle = '#f6f5f1'; ctx.fillRect(0, 0, LW, 30000);
+  const HH = lHeader(ctx, d, '施術前後の比較');
+  let y = HH + 40;
+  d.cmps.forEach((c) => {
+    const v = d.views.find((x) => x.key === c.view);
+    ctx.font = '700 42px ' + FONT_SERIF; ctx.fillStyle = C_DEEP; ctx.textBaseline = 'top'; ctx.textAlign = 'left'; ctx.fillText(v.title, LM, y); y += 70;
+    const pw = 420, ph = 560;
+    photoFrameL(ctx, v.before, LM, y, pw, ph, '施術前');
+    photoFrameL(ctx, v.after, LM + pw + 24, y, pw, ph, '施術後', C_GOLD_L, '#3d2f08');
+    const cx = LM + pw * 2 + 24 + 32, cw = LW - LM - cx, pad = 36, gapc = 36, colW = (cw - pad * 2 - gapc) / 2;
+    const m = MC(); const rows = c.rows; const heights = [];
+    for (let i = 0; i < rows.length; i += 2) { let hh = cmpCell(m, rows[i], 0, 0, colW); if (rows[i + 1]) hh = Math.max(hh, cmpCell(m, rows[i + 1], 0, 0, colW)); heights.push(hh); }
+    const total = pad + 52 + heights.reduce((a, b) => a + b + 26, 0) + pad - 26;
+    const bh = Math.max(ph, total);
+    softCard(ctx, cx, y, cw, bh, 30, '#ffffff');
+    ctx.fillStyle = C_TEAL; ctx.beginPath(); ctx.arc(cx + pad + 11, y + pad + 17, 11, 0, Math.PI * 2); ctx.fill();
+    ctx.font = '500 27px ' + FONT_SANS; ctx.fillStyle = C_INK; ctx.textBaseline = 'top'; ctx.textAlign = 'left'; ctx.fillText('施術前', cx + pad + 32, y + pad + 3);
+    ctx.fillStyle = C_GOLD; ctx.beginPath(); ctx.arc(cx + pad + 190, y + pad + 17, 11, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = C_INK; ctx.fillText('施術後', cx + pad + 212, y + pad + 3);
+    ctx.font = '400 24px ' + FONT_SANS; ctx.fillStyle = C_MUTED; ctx.fillText('数値は「施術前 → 施術後」', cx + pad + 350, y + pad + 5);
+    let yy = y + pad + 52;
+    heights.forEach((hh, gi) => {
+      cmpCell(ctx, rows[gi * 2], cx + pad, yy, colW); if (rows[gi * 2 + 1]) cmpCell(ctx, rows[gi * 2 + 1], cx + pad + colW + gapc, yy, colW);
+      yy += hh + 26; if (gi < heights.length - 1) { ctx.fillStyle = '#e6ecea'; ctx.fillRect(cx + pad, yy - 14, cw - pad * 2, 2); }
     });
-    y = para(ctx, d.cmpNote, RM, y, RW - RM * 2, '400 24px ' + FONT_SANS, C_MUTED, 38) + 56;
-  }
-
-  // ⑥ 注意書き（フッター）
-  const fpad = 48, fy = y;
-  const m = MC(); const dEnd = para(m, DISCLAIMER, 0, 0, RW - RM * 2, '400 22px ' + FONT_SANS, '#fff', 34);
-  const FH = fpad + 44 + 26 + dEnd + fpad - 6;
-  ctx.fillStyle = C_DEEP; ctx.fillRect(0, fy, RW, FH);
-  ctx.fillStyle = C_GOLD_L; ctx.fillRect(0, fy, RW, 4);
-  star(ctx, RM + 16, fy + fpad + 22, 16, C_GOLD_L);
-  ctx.font = '600 28px ' + FONT_SERIF; ctx.fillStyle = '#ffffff'; ctx.textBaseline = 'middle'; ctx.textAlign = 'left'; ctx.fillText(STORE_NAME, RM + 48, fy + fpad + 22);
-  para(ctx, DISCLAIMER, RM, fy + fpad + 44 + 26, RW - RM * 2, '400 22px ' + FONT_SANS, 'rgba(255,255,255,.72)', 34);
-  return fy + FH;
+    y += bh + 24;
+    if (c.extra) y = para(ctx, c.extra, LM, y + 4, LW - LM * 2, '400 26px ' + FONT_SANS, '#8a5a12', 40) + 12;
+    y += 36;
+  });
+  y = para(ctx, d.cmpNote, LM, y, LW - LM * 2, '400 27px ' + FONT_SANS, C_MUTED, 42) + 48;
+  return lFooter(ctx, y);
 }
 
 function reportData() {
@@ -982,11 +1059,17 @@ function reportData() {
 }
 function makeStatus(msg, kind) { const e = $('makeStatus'); e.hidden = !msg; e.textContent = msg || ''; e.className = 'status' + (kind ? ' ' + kind : ''); }
 function clearReportPreview() {
-  if (state.reportUrl) { URL.revokeObjectURL(state.reportUrl); state.reportUrl = null; }
-  state.reportBlob = null;
-  if (state.reportCanvas) { state.reportCanvas.width = 0; state.reportCanvas.height = 0; state.reportCanvas = null; }
-  const img = $('previewImg'); img.removeAttribute('src');
+  (state.reportUrls || []).forEach((u) => URL.revokeObjectURL(u));
+  state.reportUrls = []; state.reportBlobs = [];
+  (state.reportCanvases || []).forEach((c) => { c.width = 0; c.height = 0; }); state.reportCanvases = [];
+  $('previewImgs').textContent = '';
   $('previewBox').hidden = true; makeStatus('', ''); const s = $('shareStatus'); s.hidden = true;
+}
+function drawPage(fn, d) {
+  const scratch = document.createElement('canvas'); scratch.width = LW; scratch.height = 50;
+  const H = Math.ceil(fn(scratch.getContext('2d'), d)); scratch.width = 0;
+  const cv = document.createElement('canvas'); cv.width = LW; cv.height = H; fn(cv.getContext('2d'), d);
+  return cv;
 }
 async function makeReport() {
   const d = reportData();
@@ -995,17 +1078,19 @@ async function makeReport() {
   makeStatus('レポート画像を作成しています…', 'busy');
   await new Promise((r) => setTimeout(r, 30));
   try {
-    const scratch = document.createElement('canvas'); scratch.width = RW; scratch.height = 50;
-    const H = Math.ceil(renderReport(scratch.getContext('2d'), d));
-    scratch.width = 0;
-    const cv = document.createElement('canvas'); cv.width = RW; cv.height = H;
-    renderReport(cv.getContext('2d'), d);
-    const blob = await new Promise((res) => cv.toBlob(res, 'image/png'));
-    if (!blob) throw new Error('toBlob failed');
-    state.reportCanvas = cv; state.reportBlob = blob; state.reportUrl = URL.createObjectURL(blob);
-    $('previewImg').src = state.reportUrl;
+    const fns = [renderPage1]; if (d.cmps.length) fns.push(renderPage2);
+    const cvs = [], blobs = [];
+    for (const fn of fns) {
+      const cv = drawPage(fn, d); cvs.push(cv);
+      const blob = await new Promise((res) => cv.toBlob(res, 'image/png'));
+      if (!blob) throw new Error('toBlob failed');
+      blobs.push(blob); await new Promise((r) => setTimeout(r, 0));
+    }
+    state.reportCanvases = cvs; state.reportBlobs = blobs; state.reportUrls = blobs.map((b) => URL.createObjectURL(b));
+    const box = $('previewImgs'); box.textContent = '';
+    state.reportUrls.forEach((u, i) => { const im = document.createElement('img'); im.src = u; im.alt = 'レポート画像のプレビュー（' + (i + 1) + '/' + blobs.length + '枚目）'; box.appendChild(im); });
     $('previewBox').hidden = false;
-    makeStatus('レポート画像ができました（' + RW + '×' + H + 'px / PNG）。内容を確認してから保存・共有してください。', 'ok');
+    makeStatus('レポート画像ができました（' + blobs.length + '枚 / 横長・PNG）。内容を確認してから保存・共有してください。', 'ok');
     $('previewBox').scrollIntoView({ behavior: 'smooth', block: 'start' });
   } catch (e) {
     makeStatus('レポート画像を作成できませんでした。写真の枚数を減らして、もう一度お試しください。', 'err');
@@ -1016,16 +1101,17 @@ async function makeReport() {
    保存・共有（スタッフがボタンを押したときだけ実行）
    ========================================================= */
 function shareStatus(msg, kind) { const e = $('shareStatus'); e.hidden = !msg; e.textContent = msg || ''; e.className = 'status' + (kind ? ' ' + kind : ''); }
-function reportFile() {
+function reportFiles() {
   const d = new Date(); const p = (n) => String(n).padStart(2, '0');
-  return new File([state.reportBlob], 'star-posture-report-' + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + '.png', { type: 'image/png' });
+  const base = 'star-posture-report-' + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate());
+  return state.reportBlobs.map((b, i) => new File([b], base + (state.reportBlobs.length > 1 ? '-' + (i + 1) : '') + '.png', { type: 'image/png' }));
 }
 async function shareReport() {
-  if (!state.reportBlob) return;
-  const f = reportFile();
+  if (!state.reportBlobs.length) return;
+  const files = reportFiles();
   try {
-    if (navigator.canShare && navigator.canShare({ files: [f] }) && navigator.share) {
-      await navigator.share({ files: [f], title: '姿勢分析レポート' });
+    if (navigator.canShare && navigator.canShare({ files }) && navigator.share) {
+      await navigator.share({ files, title: '姿勢分析レポート' });
       shareStatus('共有画面を閉じました。送信できたかどうかは、LINEなど送り先のアプリでご確認ください。', '');
     } else {
       shareStatus('この環境では共有機能が使えません。「画像を保存」を押すか、上の画像を長押しして保存してから、LINEなどで送ってください。', 'busy');
@@ -1035,12 +1121,16 @@ async function shareReport() {
     else shareStatus('共有を開始できませんでした。上の画像を長押しして保存してから、LINEなどで送ってください。', 'err');
   }
 }
-function saveReport() {
-  if (!state.reportBlob) return;
+async function saveReport() {
+  if (!state.reportBlobs.length) return;
   try {
-    const a = document.createElement('a'); a.href = state.reportUrl; a.download = reportFile().name;
-    document.body.appendChild(a); a.click(); a.remove();
-    shareStatus('保存を開始しました。iPhoneでは「ファイル」アプリのダウンロードに入ります。写真アプリに入れたい場合は、上の画像を長押しして「写真に追加」を選んでください。', '');
+    const files = reportFiles();
+    for (let i = 0; i < files.length; i++) {
+      const a = document.createElement('a'); a.href = state.reportUrls[i]; a.download = files[i].name;
+      document.body.appendChild(a); a.click(); a.remove();
+      await new Promise((r) => setTimeout(r, 500));
+    }
+    shareStatus('保存を開始しました（' + files.length + '枚）。iPhoneでは「ファイル」アプリのダウンロードに入ります。写真アプリに入れたい場合は、上の画像を長押しして「写真に追加」を選んでください。', '');
   } catch (e) {
     shareStatus('保存を開始できませんでした。上の画像を長押しして「写真に追加」を選んでください。', 'err');
   }
